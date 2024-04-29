@@ -110,6 +110,9 @@ class Codebook:
             self.check()
 
     def improve(self, data, lagrange_mult=0.0):
+        """
+        Perform one round of codebook improvement using the Lloyd-Max algorithm.
+        """
         if lagrange_mult != 0.0:
             self.remove_unused(data)
             v = self.values
@@ -125,10 +128,45 @@ class Codebook:
         self.check()
 
     def close_to(self, other, tol=1.0e-6):
+        """
+        Returns whether two codebooks are very similar.
+        """
         if len(self) != len(other):
             return False
         data_range = max(self.values.max() - self.values.min(), 1.0e-10)
         return np.allclose(self.values, other.values, atol=tol * data_range)
+
+    @staticmethod
+    def random(data, codebook_size):
+        """
+        Create a codebook from random sampling.
+        """
+        values = np.unique(data)
+        return Codebook(
+            np.random.choice(values, min(codebook_size, values.size), replace=False)
+        )
+
+    @staticmethod
+    def uniform(data, codebook_size):
+        """
+        Create a uniform codebook.
+        """
+        return Codebook(np.linspace(data.min(), data.max(), codebook_size))
+
+    @staticmethod
+    def equiprobable(data, codebook_size):
+        """
+        Create a codebook where each codeword is equiprobable.
+        """
+        parts = np.array_split(np.sort(data), codebook_size)
+        parts = [p for p in parts if len(p) > 0]
+        limits = [(parts[k][-1] + parts[k + 1][0]) / 2 for k in range(len(parts) - 1)]
+        # Temporary values
+        values = [p.mean() for p in parts]
+        cb = Codebook(values, limits)
+        # Reset to the centroids
+        cb.values = cb.centroids(data)
+        return cb
 
 
 def lloyd_max(
@@ -141,14 +179,9 @@ def lloyd_max(
     assert data.ndim == 1
     # Initialize the codebook
     if random_init:
-        values = np.unique(data)
-        codebook = Codebook(
-            np.random.choice(values, min(codebook_size, values.size), replace=False)
-        )
+        codebook = Codebook.random(data, codebook_size)
     else:
-        parts = np.array_split(np.sort(data), codebook_size)
-        values = [np.mean(p) for p in parts if len(p) > 0]
-        codebook = Codebook(values)
+        codebook = Codebook.equiprobable(data, codebook_size)
     for i in range(max_iter):
         # Assign each data point to the nearest codeword
         # Update each codeword to the centroid or its datapoints

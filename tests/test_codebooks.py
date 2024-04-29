@@ -15,6 +15,19 @@ def test_quant():
     assert len(cb) == 3
 
 
+def test_uniform():
+    values = np.array([1, 2, 4, 5, 7, 8, 10, 11], dtype=np.float32)
+    cb = Codebook.uniform(values, 3)
+    assert np.allclose(cb.values, [1.0, 6.0, 11.0])
+
+
+def test_equiprobable():
+    values = np.array([1, 2, 4, 5, 7, 8, 10, 11], dtype=np.float32)
+    cb = Codebook.equiprobable(values, 4)
+    assert np.allclose(cb.values, [1.5, 4.5, 7.5, 10.5])
+    assert np.allclose(cb.limits, [3, 6, 9])
+
+
 def test_lloyd():
     data = np.random.randn(1000)
     cb = lloyd_max(data, 8)
