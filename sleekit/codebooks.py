@@ -96,13 +96,18 @@ class Codebook:
 
     def remove_unused(self, data):
         """
-        Remove unused codewords from the codebook.
+        Remove unused codewords from the codebook; the old limits are kept and will be suboptimal.
         """
         quant = self.quantize_index(data)
         counts = np.bincount(quant, minlength=len(self.values))
         if (counts == 0).any():
             self.values = self.values[counts != 0]
+            # Remove limits where the left bin has been removed
             self.limits = self.limits[counts[:-1] != 0]
+            # Remove the last limit if needed
+            if counts[-1] == 0:
+                self.limits = self.limits[:-1]
+            self.check()
 
     def improve(self, data, lagrange_mult=0.0):
         if lagrange_mult != 0.0:
@@ -111,6 +116,8 @@ class Codebook:
             l = -np.log2(self.probabilities(data))
             penalty = (l[1:] - l[:-1]) / (v[1:] - v[:-1])
             self.limits = (v[:-1] + v[1:]) / 2 + lagrange_mult * penalty / 2
+            # Workaround when the penalty throws the ordering away
+            self.limits.sort()
         else:
             v = self.values
             self.limits = (v[:-1] + v[1:]) / 2
@@ -124,15 +131,22 @@ class Codebook:
         return np.allclose(self.values, other.values, atol=tol * data_range)
 
 
-def lloyd_max(data, codebook_size, lagrange_mult=0.0, max_iter=100, tol=1e-6):
+def lloyd_max(
+    data, codebook_size, lagrange_mult=0.0, max_iter=100, tol=1e-6, random_init=False
+):
     """
     Lloyd-Max algorithm for scalar quantization.
     Returns a codebook that minimizes a combination of the mse and the etropy.
     """
     assert data.ndim == 1
     # Initialize the codebook
-    data_range = data.max() - data.min()
-    codebook = Codebook(np.linspace(data.min(), data.max(), codebook_size))
+    if random_init:
+        values = np.unique(data)
+        codebook = Codebook(
+            np.random.choice(values, min(codebook_size, values.size), replace=False)
+        )
+    else:
+        codebook = Codebook(np.linspace(data.min(), data.max(), codebook_size))
     for i in range(max_iter):
         # Assign each data point to the nearest codeword
         # Update each codeword to the centroid or its datapoints
