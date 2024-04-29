@@ -75,7 +75,7 @@ class Codebook:
 
     def centroids(self, data):
         """
-        Return the centroid for each codeword in the data.
+        Return the centroid for each codeword in the data based on the current bin limits.
         """
         labels = self.quantize_index(data)
         ret = []
@@ -94,17 +94,34 @@ class Codebook:
                     ret.append((self.limits[k - 1] + self.limits[k]) / 2)
         return np.array(ret)
 
+    def remove_unused(self, data):
+        """
+        Remove unused codewords from the codebook.
+        """
+        quant = self.quantize_index(data)
+        counts = np.bincount(quant, minlength=len(self.values))
+        if (counts == 0).any():
+            self.values = self.values[counts != 0]
+            self.limits = self.limits[counts[:-1] != 0]
+
     def improve(self, data, lagrange_mult=0.0):
-        v = self.values
-        mid_points = (v[:-1] + v[1:]) / 2
         if lagrange_mult != 0.0:
+            self.remove_unused(data)
+            v = self.values
             l = -np.log2(self.probabilities(data))
             penalty = (l[1:] - l[:-1]) / (v[1:] - v[:-1])
-            self.limits = mid_points + lagrange_mult * penalty / 2
+            self.limits = (v[:-1] + v[1:]) / 2 + lagrange_mult * penalty / 2
         else:
-            self.limits = mid_points
+            v = self.values
+            self.limits = (v[:-1] + v[1:]) / 2
         self.values = self.centroids(data)
         self.check()
+
+    def close_to(self, other, tol=1.0e-6):
+        if len(self) != len(other):
+            return False
+        data_range = max(self.values.max() - self.values.min(), 1.0e-10)
+        return np.allclose(self.values, other.values, atol=tol * data_range)
 
 
 def lloyd_max(data, codebook_size, lagrange_mult=0.0, max_iter=100, tol=1e-6):
@@ -121,7 +138,7 @@ def lloyd_max(data, codebook_size, lagrange_mult=0.0, max_iter=100, tol=1e-6):
         # Update each codeword to the centroid or its datapoints
         new_codebook = codebook.clone()
         new_codebook.improve(data, lagrange_mult)
-        if np.allclose(new_codebook.values, codebook.values, atol=tol * data_range):
+        if new_codebook.close_to(codebook, tol):
             break
         codebook = new_codebook
     return codebook
