@@ -146,7 +146,9 @@ def lloyd_max(
             np.random.choice(values, min(codebook_size, values.size), replace=False)
         )
     else:
-        codebook = Codebook(np.linspace(data.min(), data.max(), codebook_size))
+        parts = np.array_split(np.sort(data), codebook_size)
+        values = [np.mean(p) for p in parts if len(p) > 0]
+        codebook = Codebook(values)
     for i in range(max_iter):
         # Assign each data point to the nearest codeword
         # Update each codeword to the centroid or its datapoints

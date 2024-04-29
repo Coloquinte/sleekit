@@ -24,7 +24,7 @@ def test_lloyd():
 
 def test_lloyd_max():
     data = np.random.randn(1000)
-    cb = lloyd_max(data, 8, 0.1)
+    cb = lloyd_max(data, 8, 0.01)
     assert len(cb.values) == 8
     assert len(cb.limits) == 7
 
