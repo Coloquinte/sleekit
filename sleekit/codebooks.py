@@ -118,12 +118,15 @@ class Codebook:
             v = self.values
             l = -np.log2(self.probabilities(data))
             penalty = (l[1:] - l[:-1]) / (v[1:] - v[:-1])
+            # Assign each data point to the nearest codeword plus a penalty to gear towards low entropy
             self.limits = (v[:-1] + v[1:]) / 2 + lagrange_mult * penalty / 2
             # Workaround when the penalty throws the ordering away
             self.limits.sort()
         else:
             v = self.values
+            # Assign each data point to the nearest codeword
             self.limits = (v[:-1] + v[1:]) / 2
+        # Update each codeword to the centroid or its datapoints
         self.values = self.centroids(data)
         self.check()
 
@@ -176,15 +179,12 @@ def lloyd_max(
     Lloyd-Max algorithm for scalar quantization.
     Returns a codebook that minimizes a combination of the mse and the etropy.
     """
-    assert data.ndim == 1
-    # Initialize the codebook
+    data = np.reshape(data, (-1,))
     if random_init:
         codebook = Codebook.random(data, codebook_size)
     else:
         codebook = Codebook.equiprobable(data, codebook_size)
     for i in range(max_iter):
-        # Assign each data point to the nearest codeword
-        # Update each codeword to the centroid or its datapoints
         new_codebook = codebook.clone()
         new_codebook.improve(data, lagrange_mult)
         if new_codebook.close_to(codebook, tol):
