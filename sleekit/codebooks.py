@@ -57,6 +57,12 @@ class Codebook:
         """
         return self.values[self.quantize_index(data)]
 
+    def __call__(self, data):
+        """
+        Quantize data to their value in the codebook.
+        """
+        return self.quantize_value(data)
+
     def probabilities(self, data):
         """
         Return the probability of each codeword in the data.
@@ -156,11 +162,12 @@ class Codebook:
         )
 
     @staticmethod
-    def uniform(data, codebook_size):
+    def uniform(codebook_size, min, max):
         """
         Create a uniform codebook.
         """
-        return Codebook(np.linspace(data.min(), data.max(), codebook_size))
+        assert min <= max
+        return Codebook(np.linspace(min, max, codebook_size))
 
     @staticmethod
     def equiprobable(data, codebook_size):

@@ -15,9 +15,24 @@ def test_quant():
     assert len(cb) == 3
 
 
+def test_dim_quant():
+    cb = Codebook([-1, 0, 1])
+    data = np.array([[-2, 1, 0], [0.8, 0.1, -1]])
+    expected = np.array([[-1, 1, 0], [1, 0, -1]])
+    assert np.allclose(cb.quantize_value(data), expected)
+
+
+def test_repeated():
+    values = [0.0, 0.5, 1.0]
+    cb = Codebook(values)
+    data = np.random.randn(1000)
+    quant = cb.quantize_value(data)
+    assert np.all(quant == cb.quantize_value(quant))
+
+
 def test_uniform():
     values = np.array([1, 2, 4, 5, 7, 8, 10, 11], dtype=np.float32)
-    cb = Codebook.uniform(values, 3)
+    cb = Codebook.uniform(3, values.min(), values.max())
     assert np.allclose(cb.values, [1.0, 6.0, 11.0])
 
 
