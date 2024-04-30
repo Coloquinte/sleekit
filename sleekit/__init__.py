@@ -1,3 +1,3 @@
 
-from . import codebooks
+from . import codebook
 from . import scaling

@@ -1,6 +1,6 @@
 import numpy as np
-from sleekit.codebooks import Codebook
-from sleekit.codebooks import lloyd_max
+from sleekit.codebook import Codebook
+from sleekit.codebook import lloyd_max
 
 
 def test_quant():
