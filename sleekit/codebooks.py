@@ -10,9 +10,9 @@ class Codebook:
         """
         Create a codebook from a list of values, and optionally a list of limits between bins.
         """
-        self.values = np.array(values)
+        self.values = np.array(values, dtype=np.float32)
         if limits is not None:
-            self.limits = np.array(limits)
+            self.limits = np.array(limits, dtype=np.float32)
         else:
             self.values.sort()
             self.limits = (self.values[:-1] + self.values[1:]) / 2
@@ -43,7 +43,13 @@ class Codebook:
         """
         Quantize data to their index in the codebook.
         """
-        return np.digitize(data, self.limits)
+        vals = np.digitize(data, self.limits)
+        if len(self) <= 2**8:
+            return vals.astype(np.uint8)
+        elif len(self) <= 2**16:
+            return vals.astype(np.uint16)
+        else:
+            return vals.astype(np.uint32)
 
     def quantize_value(self, data):
         """
