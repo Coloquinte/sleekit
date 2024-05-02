@@ -29,8 +29,18 @@ def test_hessian():
 
 
 def test_obq():
-    H = random_psd_matrix(10, 2) + 1.0e-6 * np.eye(10)
-    W = 10.0 * np.random.randn(2, 10)
+    size = 100
+    damp = 1.0e-6
+    H = random_psd_matrix(size, 2, damp)
+    W = 10.0 * np.random.randn(10, size)
     quantizer = lambda x: np.round(x)
-    Q = quantize_opt(W, H, quantizer)
-    assert Q.shape == W.shape
+    Q_ordered = quantize_opt(W, H, quantizer, act_order=True)
+    Q_unordered = quantize_opt(W, H, quantizer, act_order=False)
+    assert Q_unordered.shape == W.shape
+    assert Q_ordered.shape == W.shape
+    error_direct = quantization_error(W, quantizer(W), H)
+    error_ordered = quantization_error(W, Q_ordered, H)
+    error_unordered = quantization_error(W, Q_unordered, H)
+    # We may be unlucky but given the sizes involved we should be fine
+    assert error_unordered <= error_direct
+    assert error_ordered <= error_unordered
