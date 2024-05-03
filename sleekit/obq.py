@@ -48,7 +48,23 @@ def _quantize_opt_core(W, Hinv, quantizer):
     return (Q, E)
 
 
-def quantize_opt(W, H, quantizer, act_order=True):
+def _quantize_opt_block(W, Hinv, quantizer, block_size):
+    """
+    Quantization algorithm using block operations for speed.
+    """
+    Q = W.copy()
+    for i in range(0, W.shape[1], block_size):
+        # Quantize the block
+        e = min(i + block_size, W.shape[1])
+        w = Q[:, i:e]
+        q, err = _quantize_opt_core(w, Hinv[i:e, i:e], quantizer)
+        Q[:, i:e] = q
+        # Now correct the error
+        Q[:, e:] -= err @ Hinv[i:e, e:]
+    return Q
+
+
+def quantize_opt(W, H, quantizer, act_order=True, block_size=128):
     """
     Quantize the weights with the given quantizer, minimizing the squared error using a GPTQ-like algorithm.
 
@@ -70,7 +86,7 @@ def quantize_opt(W, H, quantizer, act_order=True):
 
     # Apply the algorithm itself
     Hinv = compute_hessian_chol(H)
-    Q, _ = _quantize_opt_core(W, Hinv, quantizer)
+    Q = _quantize_opt_block(W, Hinv, quantizer, block_size)
 
     # Reorder if required
     if act_order:

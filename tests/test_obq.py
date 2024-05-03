@@ -34,8 +34,8 @@ def test_obq():
     H = random_psd_matrix(size, 2, damp)
     W = 10.0 * np.random.randn(10, size)
     quantizer = lambda x: np.round(x)
-    Q_ordered = quantize_opt(W, H, quantizer, act_order=True)
-    Q_unordered = quantize_opt(W, H, quantizer, act_order=False)
+    Q_ordered = quantize_opt(W, H, quantizer, act_order=True, block_size=size)
+    Q_unordered = quantize_opt(W, H, quantizer, act_order=False, block_size=size)
     assert Q_unordered.shape == W.shape
     assert Q_ordered.shape == W.shape
     error_direct = quantization_error(W, quantizer(W), H)
@@ -44,3 +44,14 @@ def test_obq():
     # We may be unlucky but given the sizes involved we should be fine
     assert error_unordered <= error_direct
     assert error_ordered <= error_unordered
+
+
+def test_blockobq():
+    size = 100
+    damp = 1.0e-6
+    H = random_psd_matrix(size, 2, damp)
+    W = 10.0 * np.random.randn(1, size)
+    quantizer = lambda x: np.round(x)
+    Q1 = quantize_opt(W, H, quantizer, block_size=size, act_order=False)
+    Q2 = quantize_opt(W, H, quantizer, block_size=1, act_order=False)
+    assert np.allclose(Q1, Q2)
