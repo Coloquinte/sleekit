@@ -29,7 +29,7 @@ def test_hessian():
 
 
 def test_obq():
-    size = 100
+    size = 1000
     damp = 1.0e-6
     H = random_psd_matrix(size, 2, damp)
     W = 10.0 * np.random.randn(10, size)
@@ -54,4 +54,5 @@ def test_blockobq():
     quantizer = lambda x: np.round(x)
     Q1 = quantize_opt(W, H, quantizer, block_size=size, act_order=False)
     Q2 = quantize_opt(W, H, quantizer, block_size=1, act_order=False)
+    # We may be unlucky for close to values close to a half-integer, but should be fine
     assert np.allclose(Q1, Q2)
