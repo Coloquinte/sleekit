@@ -30,6 +30,24 @@ def quantization_error(W, Q, H):
     return np.einsum("ij,...i,...j", H, E, E).mean()
 
 
+def _quantize_opt_core(W, Hinv, quantizer):
+    """
+    Core of the quantization algorithm, without block operations.
+    """
+    Q = W.copy()
+    E = np.zeros(W.shape)
+    for i in range(W.shape[1]):
+        # Quantize the column
+        w = Q[:, i]
+        q = quantizer(w)
+        err = (w - q) / Hinv[i, i]
+        E[:, i] = err
+        Q[:, i] = q
+        # Now correct the error
+        Q[:, i + 1 :] -= np.outer(err, Hinv[i, i + 1 :])
+    return (Q, E)
+
+
 def quantize_opt(W, H, quantizer, act_order=True):
     """
     Quantize the weights with the given quantizer, minimizing the squared error using a GPTQ-like algorithm.
@@ -52,15 +70,7 @@ def quantize_opt(W, H, quantizer, act_order=True):
 
     # Apply the algorithm itself
     Hinv = compute_hessian_chol(H)
-    Q = W.copy()
-    for i in range(W.shape[1]):
-        # Quantize the column
-        w = Q[:, i : i + 1]
-        q = quantizer(w)
-        err = (w - q) / Hinv[i, i]
-        Q[:, i : i + 1] = q
-        # Now correct the error
-        Q[:, i + 1 :] -= err @ Hinv[i : i + 1, i + 1 :]
+    Q, _ = _quantize_opt_core(W, Hinv, quantizer)
 
     # Reorder if required
     if act_order:
