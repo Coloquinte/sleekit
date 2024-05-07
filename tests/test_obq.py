@@ -16,16 +16,17 @@ def test_psd():
 
 
 def test_hessian():
-    H = random_psd_matrix(4, 6)
+    H = random_psd_matrix(4, 6, 1.0e-6)
 
     # GPTQ way of computing it
     gptq = np.linalg.inv(H)
     gptq = np.linalg.cholesky(gptq).T
 
     # Custom faster way
-    L = compute_hessian_chol(H)
+    U = compute_hessian_chol(H)
 
-    assert np.allclose(L, gptq)
+    assert np.allclose(U, gptq)
+    assert np.allclose(np.linalg.inv(U.T @ U), H)
 
 
 def test_obq():

@@ -75,7 +75,24 @@ def _quantize_opt_block(W, Hinv, quantizer, block_size):
     return (Q, E)
 
 
-def quantize_opt(W, H, quantizer, act_order=True, block_size=128, reopt=False):
+def _quantize_opt_ordered(W, H, quantizer, order, block_size):
+    """
+    Apply quantization optimization with a given ordering.
+    """
+    # Apply reordering
+    W = W[:, order]
+    H = H[order][:, order]
+
+    # Apply the algorithm itself
+    Hinv = compute_hessian_chol(H)
+    Q, _ = _quantize_opt_block(W, Hinv, quantizer, block_size)
+
+    # Reverse reordering
+    Q = Q[:, np.argsort(order)]
+    return Q
+
+
+def quantize_opt(W, H, quantizer, act_order=True, block_size=128):
     """
     Quantize the weights with the given quantizer, minimizing the squared error using a GPTQ-like algorithm.
 
@@ -95,15 +112,9 @@ def quantize_opt(W, H, quantizer, act_order=True, block_size=128, reopt=False):
     # Reorder if required, by order of decreasing diagonal elements
     if act_order:
         order = np.argsort(-np.diag(H))
-        W = W[:, order]
-        H = H[order][:, order]
+    else:
+        order = np.arange(W.shape[1])
 
-    # Apply the algorithm itself
-    Hinv = compute_hessian_chol(H)
-    Q, _ = _quantize_opt_block(W, Hinv, quantizer, block_size)
-
-    # Reorder if required
-    if act_order:
-        Q = Q[:, np.argsort(order)]
+    Q = _quantize_opt_ordered(W, H, quantizer, order, block_size)
 
     return Q
