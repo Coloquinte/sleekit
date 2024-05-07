@@ -57,3 +57,17 @@ def test_blockobq():
     Q2 = quantize_opt(W, H, quantizer, block_size=1, act_order=False)
     # We may be unlucky for close to values close to a half-integer, but should be fine
     assert np.allclose(Q1, Q2)
+
+
+def test_reopt():
+    size = 1000
+    damp = 1.0e-6
+    H = random_psd_matrix(size, 2, damp)
+    W = 10.0 * np.random.randn(10, size)
+    quantizer = lambda x: np.round(x)
+    Q_noopt = quantize_opt(W, H, quantizer, reopt=False)
+    Q_reopt = quantize_opt(W, H, quantizer, reopt=True)
+    error_noopt = quantization_error(W, Q_noopt, H)
+    error_reopt = quantization_error(W, Q_reopt, H)
+    # We may be unlucky but given the sizes involved we should be fine
+    assert error_reopt <= error_noopt

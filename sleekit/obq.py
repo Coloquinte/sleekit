@@ -39,7 +39,7 @@ def quantization_error(W, Q, H):
     return np.einsum("ij,...i,...j", H, E, E).mean()
 
 
-def _quantize_opt_core(W, Hinv, quantizer):
+def _quantize_opt_core(W, Hinv, quantizer, preQ=None):
     """
     Core of the quantization algorithm, without block operations.
     """
@@ -48,7 +48,10 @@ def _quantize_opt_core(W, Hinv, quantizer):
     for i in range(W.shape[1]):
         # Quantize the column
         w = Q[:, i]
-        q = quantizer(w)
+        if preQ is not None and preQ.shape[1] > i:
+            q = preQ[:, i]
+        else:
+            q = quantizer(w)
         err = (w - q) / Hinv[i, i]
         E[:, i] = err
         Q[:, i] = q
@@ -57,7 +60,7 @@ def _quantize_opt_core(W, Hinv, quantizer):
     return (Q, E)
 
 
-def _quantize_opt_block(W, Hinv, quantizer, block_size):
+def _quantize_opt_block(W, Hinv, quantizer, block_size, preQ=None):
     """
     Quantization algorithm using block operations for speed.
     """
@@ -67,7 +70,8 @@ def _quantize_opt_block(W, Hinv, quantizer, block_size):
         # Quantize the block
         e = min(i + block_size, W.shape[1])
         w = Q[:, i:e]
-        q, err = _quantize_opt_core(w, Hinv[i:e, i:e], quantizer)
+        preq = preQ[:, i:e] if preQ is not None else None
+        q, err = _quantize_opt_core(w, Hinv[i:e, i:e], quantizer, preq)
         E[:, i:e] = err
         Q[:, i:e] = q
         # Now correct the error
@@ -92,7 +96,27 @@ def _quantize_opt_ordered(W, H, quantizer, order, block_size):
     return Q
 
 
-def quantize_opt(W, H, quantizer, act_order=True, block_size=128):
+def _quantize_opt_ordered_prequantized(
+    W, H, quantizer, order, block_size, preQ, num_prequantized
+):
+    """
+    Apply quantization optimization with a given ordering and the first values prequantized.
+    """
+    # Apply reordering
+    W = W[:, order]
+    preQ = preQ[:, order][:, :num_prequantized]
+    H = H[order][:, order]
+
+    # Apply the algorithm itself
+    Hinv = compute_hessian_chol(H)
+    Q, _ = _quantize_opt_block(W, Hinv, quantizer, block_size, preQ)
+
+    # Reverse reordering
+    Q = Q[:, np.argsort(order)]
+    return Q
+
+
+def quantize_opt(W, H, quantizer, act_order=True, block_size=128, reopt=False):
     """
     Quantize the weights with the given quantizer, minimizing the squared error using a GPTQ-like algorithm.
 
@@ -116,5 +140,15 @@ def quantize_opt(W, H, quantizer, act_order=True, block_size=128):
         order = np.arange(W.shape[1])
 
     Q = _quantize_opt_ordered(W, H, quantizer, order, block_size)
+
+    if reopt:
+        h = len(order) // 2
+        # Requantize the first half with info from the second
+        half_order = np.concatenate((order[0::+2], order[1::+2]))
+        Q = _quantize_opt_ordered_prequantized(
+            W, H, quantizer, half_order, block_size, Q, len(order) - h
+        )
+        # Requantize the second half
+        Q = _quantize_opt_ordered_prequantized(W, H, quantizer, order, block_size, Q, h)
 
     return Q
