@@ -54,6 +54,8 @@ def test_blockobq():
     W = 10.0 * np.random.randn(1, size)
     quantizer = lambda x: np.round(x)
     Q1 = quantize_opt(W, H, quantizer, block_size=size, act_order=False)
-    Q2 = quantize_opt(W, H, quantizer, block_size=1, act_order=False)
+    Q2 = quantize_opt(W, H, quantizer, block_size=10, act_order=False)
+    Q3 = quantize_opt(W, H, quantizer, block_size=1, act_order=False)
     # We may be unlucky for close to values close to a half-integer, but should be fine
     assert np.allclose(Q1, Q2)
+    assert np.allclose(Q1, Q3)
