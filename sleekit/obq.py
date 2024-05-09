@@ -118,3 +118,42 @@ def quantize_opt(W, H, quantizer, act_order=True, block_size=128):
     Q = _quantize_opt_ordered(W, H, quantizer, order, block_size)
 
     return Q
+
+
+def quantize_cg(
+    W,
+    H,
+    quantizer,
+    initial_penalty=1.0e-6,
+    penalty_update=1.5,
+    max_iter=100,
+    cg_iter=10,
+):
+    """
+    Quantize the weights with the given quantizer, minimizing the squared error using a conjugate gradient algorithm with Lagrange multiplier.
+    """
+    assert W.ndim == 2
+    assert H.ndim == 2
+    assert H.shape[0] == H.shape[1]
+    assert H.shape[0] == W.shape[1]
+    W = W.astype(np.float32)
+    H = H.astype(np.float32)
+    Q = quantizer(W)
+    # Initial guess for Q - W
+    x = np.zeros(W.shape, W.dtype)
+    lagrange_mult = initial_penalty
+    for i in range(max_iter):
+        # Run the conjugate gradient algorithm on the penalized problem
+        A = H + lagrange_mult * np.eye(H.shape[0])
+        b = lagrange_mult * (Q - W)
+        r = x @ A - b
+        p = r
+        assert x.shape == r.shape
+        for j in range(cg_iter):
+            r_norm = np.sum(r ** 2, axis=1, keepdims=True)
+            step_size = r_norm
+            r = (x - W) @ H + lagrange_mult * (x - Q)
+            pass
+        Q = quantizer(W + x)
+        lagrange_mult *= penalty_update
+    return Q

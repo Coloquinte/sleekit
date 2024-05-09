@@ -3,6 +3,7 @@ import numpy as np
 from sleekit.obq import (
     random_psd_matrix,
     compute_hessian_chol,
+    quantize_cg,
     quantize_opt,
     quantization_error,
 )
@@ -59,3 +60,12 @@ def test_blockobq():
     # We may be unlucky for close to values close to a half-integer, but should be fine
     assert np.allclose(Q1, Q2)
     assert np.allclose(Q1, Q3)
+
+
+def test_cg():
+    size = 1000
+    damp = 1.0e-6
+    H = random_psd_matrix(size, 2, damp)
+    W = 10.0 * np.random.randn(10, size)
+    quantizer = lambda x: np.round(x)
+    Q = quantize_cg(W, H, quantizer)
