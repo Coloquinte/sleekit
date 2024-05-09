@@ -12,38 +12,44 @@ class Codebook:
         """
         self.values = np.array(values, dtype=np.float32)
         if limits is not None:
-            self.limits = np.array(limits, dtype=np.float32)
+            self.thresholds = np.array(limits, dtype=np.float32)
         else:
             self.values.sort()
-            self.limits = (self.values[:-1] + self.values[1:]) / 2
+            self.thresholds = (self.values[:-1] + self.values[1:]) / 2
         self.check()
 
     def clone(self):
         """
         Return a copy of the codebook.
         """
-        return Codebook(self.values.copy(), self.limits.copy())
+        return Codebook(self.values.copy(), self.thresholds.copy())
 
     def check(self):
         assert self.values.ndim == 1
         assert self.values.size > 0
         assert np.isfinite(self.values).all()
         assert (self.values[1:] > self.values[:-1]).all()
-        assert self.limits.ndim == 1
-        assert self.limits.size == self.values.size - 1
-        assert np.isfinite(self.limits).all()
-        assert (self.limits[1:] > self.limits[:-1]).all()
-        assert (self.limits >= self.values[:-1]).all()
-        assert (self.limits <= self.values[1:]).all()
+        assert self.thresholds.ndim == 1
+        assert self.thresholds.size == self.values.size - 1
+        assert np.isfinite(self.thresholds).all()
+        assert (self.thresholds[1:] > self.thresholds[:-1]).all()
+        assert (self.thresholds >= self.values[:-1]).all()
+        assert (self.thresholds <= self.values[1:]).all()
 
     def __len__(self):
         return len(self.values)
+
+    def min(self):
+        return self.values[0]
+
+    def max(self):
+        return self.values[-1]
 
     def quantize_index(self, data):
         """
         Quantize data to their index in the codebook.
         """
-        vals = np.digitize(data, self.limits)
+        vals = np.digitize(data, self.thresholds)
         if len(self) <= 2**8:
             return vals.astype(np.uint8)
         elif len(self) <= 2**16:
@@ -99,11 +105,11 @@ class Codebook:
             else:
                 # Edge case: no data point in the bin
                 if k == 0:
-                    ret.append(self.limits[0] - 1.0e-6)
+                    ret.append(self.thresholds[0] - 1.0e-6)
                 elif k == len(self.values) - 1:
-                    ret.append(self.limits[-1] + 1.0e-6)
+                    ret.append(self.thresholds[-1] + 1.0e-6)
                 else:
-                    ret.append((self.limits[k - 1] + self.limits[k]) / 2)
+                    ret.append((self.thresholds[k - 1] + self.thresholds[k]) / 2)
         return np.array(ret)
 
     def remove_unused(self, data):
@@ -115,10 +121,10 @@ class Codebook:
         if (counts == 0).any():
             self.values = self.values[counts != 0]
             # Remove limits where the left bin has been removed
-            self.limits = self.limits[counts[:-1] != 0]
+            self.thresholds = self.thresholds[counts[:-1] != 0]
             # Remove the last limit if needed
             if counts[-1] == 0:
-                self.limits = self.limits[:-1]
+                self.thresholds = self.thresholds[:-1]
             self.check()
 
     def improve(self, data, lagrange_mult=0.0):
@@ -131,13 +137,13 @@ class Codebook:
             l = -np.log2(self.probabilities(data))
             penalty = (l[1:] - l[:-1]) / (v[1:] - v[:-1])
             # Assign each data point to the nearest codeword plus a penalty to gear towards low entropy
-            self.limits = (v[:-1] + v[1:]) / 2 + lagrange_mult * penalty / 2
+            self.thresholds = (v[:-1] + v[1:]) / 2 + lagrange_mult * penalty / 2
             # Workaround when the penalty throws the ordering away
-            self.limits.sort()
+            self.thresholds.sort()
         else:
             v = self.values
             # Assign each data point to the nearest codeword
-            self.limits = (v[:-1] + v[1:]) / 2
+            self.thresholds = (v[:-1] + v[1:]) / 2
         # Update each codeword to the centroid or its datapoints
         self.values = self.centroids(data)
         self.check()
