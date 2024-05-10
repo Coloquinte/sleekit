@@ -25,6 +25,9 @@ class Codebook:
         return Codebook(self.values.copy(), self.thresholds.copy())
 
     def check(self):
+        """
+        Run consistency check
+        """
         assert self.values.ndim == 1
         assert self.values.size > 0
         assert np.isfinite(self.values).all()
@@ -40,9 +43,15 @@ class Codebook:
         return len(self.values)
 
     def min(self):
+        """
+        Minimum value in the codebook
+        """
         return self.values[0]
 
     def max(self):
+        """
+        Maximum value in the codebook
+        """
         return self.values[-1]
 
     def quantize_index(self, data):
