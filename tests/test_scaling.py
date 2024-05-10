@@ -47,3 +47,9 @@ def test_non_saturating_scaling():
     sc1 = compute_non_saturating_scaling(data, cb, 1)
     assert np.allclose(sc0, [1.0, 0.5, 0.2, 0.5e-18, 50.0, 50.0])
     assert np.allclose(sc1, [0.25, 0.5, 5.0, 50.0])
+
+
+def test_min_mse_scaling():
+    data = np.random.randn(1000, 1000)
+    cb = Codebook.uniform(9, -2, 2)
+    compute_min_mse_scaling(data, cb, 0)

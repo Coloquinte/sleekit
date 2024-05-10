@@ -98,9 +98,9 @@ def quantize_opt(W, H, quantizer, act_order=True, block_size=128):
 
     :param W: Weights (2D array)
     :param H: Hessian of the error (2D array)
-    :param quantizer: function that quantizes its argument and returns it
-    :param act_order: whether to use GPTQ's ordering heuristic
-    :param reopt:
+    :param quantizer: Function that quantizes its argument and returns it
+    :param act_order: Whether to use GPTQ's ordering heuristic
+    :returns: Quantized weights
     """
     assert W.ndim == 2
     assert H.ndim == 2
