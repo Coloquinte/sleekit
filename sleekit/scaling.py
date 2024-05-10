@@ -31,3 +31,15 @@ def compute_norm_scaling(data, axis=0):
     """
     other_axes = tuple(i for i in range(data.ndim) if i != axis)
     return np.sqrt(np.mean(np.square(data), axis=other_axes))
+
+
+def compute_non_saturating_scaling(data, codebook, axis=0):
+    """
+    Compute a scaling factor over this axis to have no saturation.
+
+    This yields a non-saturating scaling factor, but not necessarily the tightest one for non-symmetric codebook and data.
+    """
+    maxcode = np.maximum(np.abs(codebook.values).max(), 1.0e-16)
+    other_axes = tuple(i for i in range(data.ndim) if i != axis)
+    maxdata = np.maximum(np.abs(data).max(axis=other_axes), 1.0e-16)
+    return maxdata / maxcode

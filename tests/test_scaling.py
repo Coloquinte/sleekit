@@ -1,5 +1,6 @@
 import numpy as np
 
+from sleekit.codebook import Codebook
 from sleekit.scaling import *
 
 
@@ -28,3 +29,21 @@ def test_scaling_axis():
     assert np.allclose(sc, exp_sc)
     assert np.allclose(scaled, expected)
     assert np.allclose(apply_scaling(scaled, 1 / sc, 1), data)
+
+
+def test_non_saturating_scaling():
+    data = np.array(
+        [
+            [0.0, 10.0, -20.0, 15.0],
+            [5.0, 5.0, 10.0, -10.0],
+            [1.0, 2.0, -4.0, 3.0],
+            [0.0, 0.0, 0.0, 0.0],
+            [1.0, 10.0, 100.0, 1000.0],
+            [-1.0, 10.0, 100.0, 1000.0],
+        ]
+    )
+    cb = Codebook([-1.0, 0.0, 10.0, 20.0])
+    sc0 = compute_non_saturating_scaling(data, cb, 0)
+    sc1 = compute_non_saturating_scaling(data, cb, 1)
+    assert np.allclose(sc0, [1.0, 0.5, 0.2, 0.5e-18, 50.0, 50.0])
+    assert np.allclose(sc1, [0.25, 0.5, 5.0, 50.0])
