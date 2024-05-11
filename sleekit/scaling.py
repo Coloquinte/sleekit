@@ -39,9 +39,9 @@ def compute_non_saturating_scaling(data, codebook, axis=0):
 
     This yields a non-saturating scaling factor, but not necessarily the tightest one for non-symmetric codebook and data.
     """
-    maxcode = np.maximum(np.abs(codebook.values).max(), 1.0e-16)
+    maxcode = np.maximum(np.abs(codebook.values).max(), np.float32(1.0e-16))
     other_axes = tuple(i for i in range(data.ndim) if i != axis)
-    maxdata = np.maximum(np.abs(data).max(axis=other_axes), 1.0e-16)
+    maxdata = np.maximum(np.abs(data).max(axis=other_axes), np.float32(1.0e-16))
     return maxdata / maxcode
 
 
@@ -86,7 +86,7 @@ def compute_min_mse_scaling(
 
     # Search for the best scaling on a grid
     # TODO: implement a golden section search to make this a lot faster
-    scales = np.linspace(min_factor, max_factor, grid_size)
+    scales = np.linspace(min_factor, max_factor, grid_size, dtype=np.float32)
     best_choice = np.full(initial_scale.size, np.inf, dtype=np.float32)
     best_error = np.full(initial_scale.size, np.inf, dtype=np.float32)
     for s in scales:

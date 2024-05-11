@@ -10,7 +10,8 @@ def test_scaling_axis():
         [
             [0.0, 10.0],
             [5.0, 5.0],
-        ]
+        ],
+        dtype=np.float32,
     )
     # Axis 0
     sc = compute_norm_scaling(data, 0)
@@ -41,7 +42,8 @@ def test_non_saturating_scaling():
             [0.0, 0.0, 0.0, 0.0],
             [1.0, 10.0, 100.0, 1000.0],
             [-1.0, 10.0, 100.0, 1000.0],
-        ]
+        ],
+        dtype=np.float32,
     )
     cb = Codebook([-1.0, 0.0, 10.0, 20.0])
     sc0 = compute_non_saturating_scaling(data, cb, 0)
@@ -51,20 +53,20 @@ def test_non_saturating_scaling():
 
 
 def test_min_mse_scaling():
-    data = np.random.randn(20, 50)
+    data = np.random.randn(20, 50).astype(np.float32)
     cb = Codebook.uniform(9, -2, 2)
     compute_min_mse_scaling(data, cb, 0)
 
 
 def test_min_mse_scaling_diag_hessian():
-    data = np.random.randn(20, 50)
+    data = np.random.randn(20, 50).astype(np.float32)
     cb = Codebook.uniform(9, -2, 2)
     H = np.random.rand(50)
     compute_min_mse_scaling(data, cb, 0, H=H)
 
 
 def test_min_mse_scaling_hessian():
-    data = np.random.randn(20, 50)
+    data = np.random.randn(20, 50).astype(np.float32)
     cb = Codebook.uniform(9, -2, 2)
     H = random_psd_matrix(50, 10)
     compute_min_mse_scaling(data, cb, 0, H=H)
