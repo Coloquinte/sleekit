@@ -1,6 +1,7 @@
 import numpy as np
 
 from sleekit.codebook import Codebook
+from sleekit.obq import random_psd_matrix
 from sleekit.scaling import *
 
 
@@ -50,6 +51,20 @@ def test_non_saturating_scaling():
 
 
 def test_min_mse_scaling():
-    data = np.random.randn(1000, 1000)
+    data = np.random.randn(20, 50)
     cb = Codebook.uniform(9, -2, 2)
     compute_min_mse_scaling(data, cb, 0)
+
+
+def test_min_mse_scaling_diag_hessian():
+    data = np.random.randn(20, 50)
+    cb = Codebook.uniform(9, -2, 2)
+    H = np.random.rand(50)
+    compute_min_mse_scaling(data, cb, 0, H=H)
+
+
+def test_min_mse_scaling_hessian():
+    data = np.random.randn(20, 50)
+    cb = Codebook.uniform(9, -2, 2)
+    H = random_psd_matrix(50, 10)
+    compute_min_mse_scaling(data, cb, 0, H=H)

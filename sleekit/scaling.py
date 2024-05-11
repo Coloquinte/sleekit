@@ -45,26 +45,30 @@ def compute_non_saturating_scaling(data, codebook, axis=0):
     return maxdata / maxcode
 
 
-def _compute_mse(data, scale, codebook, H=None):
+def _quantize(data, scale, codebook):
     assert data.ndim == 2
     assert scale.ndim == 1
     assert data.shape[0] == scale.size
     quant = apply_scaling(data, scale, 0)
     quant = codebook(quant)
     quant = apply_scaling(quant, 1 / scale, 0)
-    d = quant - data
+    return quant
+
+
+def _compute_mse(data, scale, codebook, H=None):
+    err = _quantize(data, scale, codebook) - data
     if H is None:
-        return np.sum(np.square(quant - data), axis=1)
+        return np.sum(np.square(err), axis=1)
     elif H.ndim == 1:
         # Diagonal hessian
-        assert d.shape[1] == H.shape[0]
-        return np.sum(np.expand_dims(H, 0) * np.square(quant - data), axis=1)
+        assert err.shape[1] == H.shape[0]
+        return np.sum(np.expand_dims(H, 0) * np.square(err - data), axis=1)
     else:
         # Full hessian
         assert H.ndim == 2
-        assert d.shape[1] == H.shape[0]
+        assert err.shape[1] == H.shape[0]
         assert H.shape[1] == H.shape[0]
-        return np.einsum("ij,...i,...j", H, d, d)
+        return np.einsum("ij,...i,...j", H, err, err)
 
 
 def compute_min_mse_scaling(
@@ -73,16 +77,18 @@ def compute_min_mse_scaling(
     """
     Compute a scaling factor to minimize the squared error with respect to the codebook.
     """
+    # First flatten to 2D with scaling on the first dimension
     other_axes = tuple(i for i in range(data.ndim) if i != axis)
     flat_data = np.transpose(data, [axis, *other_axes])
 
-    # Start with a non-saturating scaling
+    # Compute a non-saturating scaling
     initial_scale = compute_non_saturating_scaling(flat_data, codebook, 0)
 
-    # Try scales along a grid
+    # Search for the best scaling on a grid
+    # TODO: implement a golden section search to make this a lot faster
     scales = np.linspace(min_factor, max_factor, grid_size)
-    best_choice = np.full(initial_scale.size, np.inf)
-    best_error = np.full(initial_scale.size, np.inf)
+    best_choice = np.full(initial_scale.size, np.inf, dtype=np.float32)
+    best_error = np.full(initial_scale.size, np.inf, dtype=np.float32)
     for s in scales:
         scale = s * initial_scale
         error = _compute_mse(flat_data, scale, codebook, H)
