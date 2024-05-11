@@ -45,7 +45,7 @@ def compute_non_saturating_scaling(data, codebook, axis=0):
     return maxdata / maxcode
 
 
-def _quantize(data, scale, codebook):
+def quantize_with_scaling(data, scale, codebook):
     assert data.ndim == 2
     assert scale.ndim == 1
     assert data.shape[0] == scale.size
@@ -56,7 +56,7 @@ def _quantize(data, scale, codebook):
 
 
 def _compute_mse(data, scale, codebook, H=None):
-    err = _quantize(data, scale, codebook) - data
+    err = quantize_with_scaling(data, scale, codebook) - data
     if H is None:
         return np.sum(np.square(err), axis=1)
     elif H.ndim == 1:
@@ -76,6 +76,14 @@ def compute_min_mse_scaling(
 ):
     """
     Compute a scaling factor to minimize the squared error with respect to the codebook.
+
+    :param data: Data to quantize
+    :param codebook: Codebook to be used
+    :param axis: Axis to apply the scale to
+    :param H: Hessian matrix
+    :param min_factor: Minimum scaling factor compared to a non-saturating scaling
+    :param max_factor: Maximum scaling factor compared to a non-saturating scaling
+    :param grid_size: Number of points for the grid search
     """
     # First flatten to 2D with scaling on the first dimension
     other_axes = tuple(i for i in range(data.ndim) if i != axis)
