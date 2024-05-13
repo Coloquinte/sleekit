@@ -1,4 +1,4 @@
-import numpy as np
+import torch
 
 
 def _broadcast_scaling(data, scale, axis):
@@ -8,7 +8,7 @@ def _broadcast_scaling(data, scale, axis):
     assert scale.ndim == 1
     new_shape = [1 for i in data.shape]
     new_shape[axis] = -1
-    return np.reshape(scale, new_shape)
+    return torch.reshape(scale, new_shape)
 
 
 def apply_scaling(data, scale, axis=0):
@@ -30,7 +30,7 @@ def compute_norm_scaling(data, axis=0):
     Compute a scaling factor over this axis to have squared average equal to 1.
     """
     other_axes = tuple(i for i in range(data.ndim) if i != axis)
-    return np.sqrt(np.mean(np.square(data), axis=other_axes))
+    return torch.sqrt(torch.mean(torch.square(data), axis=other_axes))
 
 
 def compute_non_saturating_scaling(data, codebook, axis=0):
@@ -39,16 +39,16 @@ def compute_non_saturating_scaling(data, codebook, axis=0):
 
     This yields a non-saturating scaling factor, but not necessarily the tightest one for non-symmetric codebook and data.
     """
-    maxcode = np.maximum(np.abs(codebook.values).max(), np.float32(1.0e-16))
+    maxcode = torch.maximum(torch.abs(codebook.values).max(), torch.tensor(1.0e-16, dtype=data.dtype))
     other_axes = tuple(i for i in range(data.ndim) if i != axis)
-    maxdata = np.maximum(np.abs(data).max(axis=other_axes), np.float32(1.0e-16))
+    maxdata = torch.maximum(torch.abs(data).amax(dim=other_axes), torch.tensor(1.0e-16, dtype=data.dtype))
     return maxdata / maxcode
 
 
 def quantize_with_scaling(data, scale, codebook):
     assert data.ndim == 2
     assert scale.ndim == 1
-    assert data.shape[0] == scale.size
+    assert data.shape[0] == len(scale)
     quant = apply_scaling(data, scale, 0)
     quant = codebook(quant)
     quant = apply_scaling(quant, 1 / scale, 0)
@@ -58,17 +58,17 @@ def quantize_with_scaling(data, scale, codebook):
 def _compute_mse(data, scale, codebook, H=None):
     err = quantize_with_scaling(data, scale, codebook) - data
     if H is None:
-        return np.sum(np.square(err), axis=1)
+        return torch.sum(torch.square(err), axis=1)
     elif H.ndim == 1:
         # Diagonal hessian
         assert err.shape[1] == H.shape[0]
-        return np.sum(np.expand_dims(H, 0) * np.square(err - data), axis=1)
+        return torch.sum(torch.expand_dims(H, 0) * torch.square(err - data), axis=1)
     else:
         # Full hessian
         assert H.ndim == 2
         assert err.shape[1] == H.shape[0]
         assert H.shape[1] == H.shape[0]
-        return np.einsum("ij,...i,...j", H, err, err)
+        return torch.einsum("ij,...i,...j", H, err, err)
 
 
 def compute_min_mse_scaling(
@@ -87,16 +87,16 @@ def compute_min_mse_scaling(
     """
     # First flatten to 2D with scaling on the first dimension
     other_axes = tuple(i for i in range(data.ndim) if i != axis)
-    flat_data = np.transpose(data, [axis, *other_axes])
+    flat_data = torch.permute(data, [axis, *other_axes])
 
     # Compute a non-saturating scaling
     initial_scale = compute_non_saturating_scaling(flat_data, codebook, 0)
 
     # Search for the best scaling on a grid
     # TODO: implement a golden section search to make this a lot faster
-    scales = np.linspace(min_factor, max_factor, grid_size, dtype=np.float32)
-    best_choice = np.full(initial_scale.size, np.inf, dtype=np.float32)
-    best_error = np.full(initial_scale.size, np.inf, dtype=np.float32)
+    scales = torch.linspace(min_factor, max_factor, grid_size, dtype=torch.float32)
+    best_choice = torch.full_like(initial_scale, torch.inf)
+    best_error = torch.full_like(initial_scale, torch.inf)
     for s in scales:
         scale = s * initial_scale
         error = _compute_mse(flat_data, scale, codebook, H)

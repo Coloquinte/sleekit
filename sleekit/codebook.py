@@ -1,4 +1,4 @@
-import numpy as np
+import torch
 
 
 class Codebook:
@@ -10,9 +10,9 @@ class Codebook:
         """
         Create a codebook from a list of values, and optionally a list of limits between bins.
         """
-        self.values = np.array(values, dtype=np.float32)
+        self.values = torch.tensor(values, dtype=torch.float32)
         if limits is not None:
-            self.thresholds = np.array(limits, dtype=np.float32)
+            self.thresholds = torch.tensor(limits, dtype=torch.float32)
         else:
             self.values.sort()
             self.thresholds = (self.values[:-1] + self.values[1:]) / 2
@@ -22,19 +22,19 @@ class Codebook:
         """
         Return a copy of the codebook.
         """
-        return Codebook(self.values.copy(), self.thresholds.copy())
+        return Codebook(self.values.clone(), self.thresholds.clone())
 
     def check(self):
         """
         Run consistency check
         """
         assert self.values.ndim == 1
-        assert self.values.size > 0
-        assert np.isfinite(self.values).all()
+        assert len(self.values) > 0
+        assert torch.isfinite(self.values).all()
         assert (self.values[1:] > self.values[:-1]).all()
         assert self.thresholds.ndim == 1
-        assert self.thresholds.size == self.values.size - 1
-        assert np.isfinite(self.thresholds).all()
+        assert len(self.thresholds) == len(self.values) - 1
+        assert torch.isfinite(self.thresholds).all()
         assert (self.thresholds[1:] > self.thresholds[:-1]).all()
         assert (self.thresholds >= self.values[:-1]).all()
         assert (self.thresholds <= self.values[1:]).all()
@@ -58,13 +58,14 @@ class Codebook:
         """
         Quantize data to their index in the codebook.
         """
-        vals = np.digitize(data, self.thresholds)
+        vals = torch.bucketize(data, self.thresholds, out_int32=True)
+        assert vals.shape == data.shape
         if len(self) <= 2**8:
-            return vals.astype(np.uint8)
+            return vals.to(torch.uint8)
         elif len(self) <= 2**16:
-            return vals.astype(np.uint16)
+            return vals.to(torch.uint16)
         else:
-            return vals.astype(np.uint32)
+            return vals.to(torch.uint32)
 
     def quantize_value(self, data):
         """
@@ -83,7 +84,7 @@ class Codebook:
         Return the probability of each codeword in the data.
         """
         quant = self.quantize_index(data)
-        return np.bincount(quant, minlength=len(self.values)) / len(data)
+        return torch.bincount(quant, minlength=len(self.values)) / len(data)
 
     def entropy(self, data):
         """
@@ -91,14 +92,14 @@ class Codebook:
         """
         probs = self.probabilities(data)
         probs = probs[probs > 0]
-        return -np.sum(probs * np.log2(probs))
+        return -torch.sum(probs * torch.log2(probs))
 
     def mse(self, data):
         """
         Return the mean squared error of the data with this codebook.
         """
         quant = self.quantize_value(data)
-        return np.mean(np.square(data - quant))
+        return torch.mean(torch.square(data - quant))
 
     def centroids(self, data):
         """
@@ -119,14 +120,14 @@ class Codebook:
                     ret.append(self.thresholds[-1] + 1.0e-6)
                 else:
                     ret.append((self.thresholds[k - 1] + self.thresholds[k]) / 2)
-        return np.array(ret)
+        return torch.tensor(ret, dtype=torch.float32)
 
     def remove_unused(self, data):
         """
         Remove unused codewords from the codebook; the old limits are kept and will be suboptimal.
         """
         quant = self.quantize_index(data)
-        counts = np.bincount(quant, minlength=len(self.values))
+        counts = torch.bincount(quant, minlength=len(self.values))
         if (counts == 0).any():
             self.values = self.values[counts != 0]
             # Remove limits where the left bin has been removed
@@ -143,7 +144,7 @@ class Codebook:
         if lagrange_mult != 0.0:
             self.remove_unused(data)
             v = self.values
-            l = -np.log2(self.probabilities(data))
+            l = -torch.log2(self.probabilities(data))
             penalty = (l[1:] - l[:-1]) / (v[1:] - v[:-1])
             # Assign each data point to the nearest codeword plus a penalty to gear towards low entropy
             self.thresholds = (v[:-1] + v[1:]) / 2 + lagrange_mult * penalty / 2
@@ -164,16 +165,16 @@ class Codebook:
         if len(self) != len(other):
             return False
         data_range = max(self.values.max() - self.values.min(), 1.0e-10)
-        return np.allclose(self.values, other.values, atol=tol * data_range)
+        return torch.allclose(self.values, other.values, atol=tol * data_range)
 
     @staticmethod
     def random(data, codebook_size):
         """
         Create a codebook from random sampling.
         """
-        values = np.unique(data)
+        values = torch.unique(data)
         return Codebook(
-            np.random.choice(values, min(codebook_size, values.size), replace=False)
+            torch.random.choice(values, min(codebook_size, values.size), replace=False)
         )
 
     @staticmethod
@@ -182,14 +183,14 @@ class Codebook:
         Create a uniform codebook.
         """
         assert min <= max
-        return Codebook(np.linspace(min, max, codebook_size))
+        return Codebook(torch.linspace(min, max, codebook_size))
 
     @staticmethod
     def equiprobable(data, codebook_size):
         """
         Create a codebook where each codeword is equiprobable.
         """
-        parts = np.array_split(np.sort(data), codebook_size)
+        parts = torch.tensor_split(torch.sort(data)[0], codebook_size)
         parts = [p for p in parts if len(p) > 0]
         limits = [(parts[k][-1] + parts[k + 1][0]) / 2 for k in range(len(parts) - 1)]
         # Temporary values
@@ -207,7 +208,7 @@ def lloyd_max(
     Lloyd-Max algorithm for scalar quantization.
     Returns a codebook that minimizes a combination of the mse and the etropy.
     """
-    data = np.reshape(data, (-1,))
+    data = torch.reshape(data, (-1,))
     if random_init:
         codebook = Codebook.random(data, codebook_size)
     else:

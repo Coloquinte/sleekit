@@ -1,4 +1,4 @@
-import numpy as np
+import torch
 
 from sleekit.obq import (
     random_psd_matrix,
@@ -11,30 +11,30 @@ from sleekit.obq import (
 def test_psd():
     H = random_psd_matrix(10, 20)
     assert H.shape == (10, 10)
-    assert np.all(np.linalg.eigvalsh(H) >= 0)
-    assert np.linalg.matrix_rank(H) == 10
+    assert torch.all(torch.linalg.eigvalsh(H) >= 0)
+    assert torch.linalg.matrix_rank(H) == 10
 
 
 def test_hessian():
     H = random_psd_matrix(4, 6, 1.0e-6)
 
     # GPTQ way of computing it
-    gptq = np.linalg.inv(H)
-    gptq = np.linalg.cholesky(gptq).T
+    gptq = torch.linalg.inv(H)
+    gptq = torch.linalg.cholesky(gptq).T
 
     # Custom faster way
     U = compute_hessian_chol(H)
 
-    assert np.allclose(U, gptq)
-    assert np.allclose(np.linalg.inv(U.T @ U), H)
+    assert torch.allclose(U, gptq)
+    assert torch.allclose(torch.linalg.inv(U.T @ U), H)
 
 
 def test_obq():
     size = 1000
     damp = 1.0e-6
     H = random_psd_matrix(size, 2, damp)
-    W = 10.0 * np.random.randn(10, size)
-    quantizer = lambda x: np.round(x)
+    W = 10.0 * torch.randn(10, size)
+    quantizer = lambda x: torch.round(x)
     Q_ordered = quantize_opt(W, H, quantizer, act_order=True, block_size=size)
     Q_unordered = quantize_opt(W, H, quantizer, act_order=False, block_size=size)
     assert Q_unordered.shape == W.shape
@@ -51,11 +51,11 @@ def test_blockobq():
     size = 100
     damp = 1.0e-6
     H = random_psd_matrix(size, 2, damp)
-    W = 10.0 * np.random.randn(1, size)
-    quantizer = lambda x: np.round(x)
+    W = 10.0 * torch.randn(1, size)
+    quantizer = lambda x: torch.round(x)
     Q1 = quantize_opt(W, H, quantizer, block_size=size, act_order=False)
     Q2 = quantize_opt(W, H, quantizer, block_size=10, act_order=False)
     Q3 = quantize_opt(W, H, quantizer, block_size=1, act_order=False)
     # We may be unlucky for close to values close to a half-integer, but should be fine
-    assert np.allclose(Q1, Q2)
-    assert np.allclose(Q1, Q3)
+    assert torch.allclose(Q1, Q2)
+    assert torch.allclose(Q1, Q3)

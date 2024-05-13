@@ -1,14 +1,14 @@
-import numpy as np
+import torch
 
 
 def random_psd_matrix(size, rank, damp=0.0):
     """
     Generate a random positive semidefinite matrix of a given size from the Wishart distribution.
     """
-    A = np.random.randn(size, rank)
-    H = np.matmul(A, A.T)
-    dampval = damp * np.linalg.norm(H, ord=2, axis=1)
-    return H + dampval * np.eye(size)
+    A = torch.randn(size, rank)
+    H = torch.matmul(A, A.T)
+    dampval = damp * torch.linalg.norm(H, ord=2, axis=1)
+    return H + dampval * torch.eye(size)
 
 
 def compute_hessian_chol(H):
@@ -20,15 +20,15 @@ def compute_hessian_chol(H):
     # We do an equivalent transformation that should be slightly faster when optimized
 
     # Work in reverse order
-    H = np.flip(H)
+    H = torch.flip(H, (0, 1))
     # Compute the Cholesky factor
     # TODO: handle semi positive definite matrices by catching LinAlgError
-    H = np.linalg.cholesky(H)
+    H = torch.linalg.cholesky(H)
     # Invert the Cholesky factor
-    H = np.linalg.inv(H)
+    H = torch.linalg.inv(H)
     # Return to the original order
-    H = np.flip(H)
-    return np.ascontiguousarray(H)
+    H = torch.flip(H, (0, 1))
+    return H.contiguous()
 
 
 def quantization_error(W, Q, H):
@@ -36,15 +36,15 @@ def quantization_error(W, Q, H):
     Compute the error between two weight matrices given the hessian
     """
     E = W - Q
-    return np.einsum("ij,...i,...j", H, E, E).mean()
+    return torch.einsum("ij,...i,...j", H, E, E).mean()
 
 
 def _quantize_opt_core(W, Hinv, quantizer):
     """
     Core of the quantization algorithm, without block operations.
     """
-    Q = W.copy()
-    E = np.zeros(W.shape, dtype=np.float32)
+    Q = W.clone()
+    E = torch.zeros_like(W)
     for i in range(W.shape[1]):
         # Quantize the column
         w = Q[:, i]
@@ -53,7 +53,7 @@ def _quantize_opt_core(W, Hinv, quantizer):
         E[:, i] = err
         Q[:, i] = q
         # Now correct the error
-        Q[:, i + 1 :] -= np.outer(err, Hinv[i, i + 1 :])
+        Q[:, i + 1 :] -= torch.outer(err, Hinv[i, i + 1 :])
     return (Q, E)
 
 
@@ -61,8 +61,8 @@ def _quantize_opt_block(W, Hinv, quantizer, block_size):
     """
     Quantization algorithm using block operations for speed.
     """
-    Q = W.copy()
-    E = np.zeros(W.shape, dtype=np.float32)
+    Q = W.clone()
+    E = torch.zeros_like(W)
     for i in range(0, W.shape[1], block_size):
         # Quantize the block
         e = min(i + block_size, W.shape[1])
@@ -88,7 +88,7 @@ def _quantize_opt_ordered(W, H, quantizer, order, block_size):
     Q, _ = _quantize_opt_block(W, Hinv, quantizer, block_size)
 
     # Reverse reordering
-    Q = Q[:, np.argsort(order)]
+    Q = Q[:, torch.argsort(order)]
     return Q
 
 
@@ -106,14 +106,14 @@ def quantize_opt(W, H, quantizer, act_order=True, block_size=128):
     assert H.ndim == 2
     assert H.shape[0] == H.shape[1]
     assert H.shape[0] == W.shape[1]
-    W = W.astype(np.float32)
-    H = H.astype(np.float32)
+    W = W.to(torch.float32)
+    H = H.to(torch.float32)
 
     # Reorder if required, by order of decreasing diagonal elements
     if act_order:
-        order = np.argsort(-np.diag(H))
+        order = torch.argsort(-torch.diag(H))
     else:
-        order = np.arange(W.shape[1])
+        order = torch.arange(W.shape[1])
 
     Q = _quantize_opt_ordered(W, H, quantizer, order, block_size)
 
