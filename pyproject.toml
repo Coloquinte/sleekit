@@ -5,7 +5,7 @@ version = "0.0.1"
 description = "Neural Network Quantization"
 readme = "README.md"
 authors = [
-    {name = "Gabriel Gouvine", email = "gabriel.gouvine_sleekit@m4x.org>"}
+    {name = "Gabriel Gouvine", email = "gabriel.gouvine_sleekit@m4x.org"}
 ]
 dependencies = ["torch", "numpy"]
 classifiers = [
