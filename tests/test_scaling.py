@@ -2,7 +2,12 @@ import numpy as np
 
 from sleekit.codebook import Codebook
 from sleekit.obq import random_psd_matrix
-from sleekit.scaling import *
+from sleekit.scaling import (
+    compute_norm_scaling,
+    apply_scaling,
+    compute_non_saturating_scaling,
+    compute_min_mse_scaling,
+)
 
 
 def test_scaling_axis():
