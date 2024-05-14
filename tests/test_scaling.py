@@ -38,6 +38,18 @@ def test_scaling_axis():
     assert np.allclose(apply_scaling(scaled, 1 / sc, 1), data)
 
 
+def test_scaling_axis_high_dim():
+    data = np.random.randn(10, 20, 30, 40).astype(np.float32)
+    sc = compute_norm_scaling(data, 0)
+    assert len(sc) == 10
+    sc = compute_norm_scaling(data, 1)
+    assert len(sc) == 20
+    sc = compute_norm_scaling(data, 2)
+    assert len(sc) == 30
+    sc = compute_norm_scaling(data, 3)
+    assert len(sc) == 40
+
+
 def test_non_saturating_scaling():
     data = np.array(
         [
@@ -57,21 +69,56 @@ def test_non_saturating_scaling():
     assert np.allclose(sc1, [0.25, 0.5, 5.0, 50.0])
 
 
+def test_non_saturating_scaling_high_dim():
+    data = np.random.randn(10, 20, 30, 40).astype(np.float32)
+    cb = Codebook.uniform(9, -2, 2)
+    sc = compute_non_saturating_scaling(data, cb, 0)
+    assert len(sc) == 10
+    sc = compute_non_saturating_scaling(data, cb, 1)
+    assert len(sc) == 20
+    sc = compute_non_saturating_scaling(data, cb, 2)
+    assert len(sc) == 30
+    sc = compute_non_saturating_scaling(data, cb, 3)
+    assert len(sc) == 40
+
+
 def test_min_mse_scaling():
     data = np.random.randn(20, 50).astype(np.float32)
     cb = Codebook.uniform(9, -2, 2)
-    compute_min_mse_scaling(data, cb, 0)
+    sc = compute_min_mse_scaling(data, cb, 0)
+    assert len(sc) == 20
+    sc = compute_min_mse_scaling(data, cb, 1)
+    assert len(sc) == 50
 
 
 def test_min_mse_scaling_diag_hessian():
     data = np.random.randn(20, 50).astype(np.float32)
     cb = Codebook.uniform(9, -2, 2)
     H = np.random.rand(50)
-    compute_min_mse_scaling(data, cb, 0, H=H)
+    sc = compute_min_mse_scaling(data, cb, 0, H=H)
+    assert len(sc) == 20
+    H = np.random.rand(20)
+    sc = compute_min_mse_scaling(data, cb, 1, H=H)
+    assert len(sc) == 50
 
 
 def test_min_mse_scaling_hessian():
     data = np.random.randn(20, 50).astype(np.float32)
     cb = Codebook.uniform(9, -2, 2)
     H = random_psd_matrix(50, 10)
-    compute_min_mse_scaling(data, cb, 0, H=H)
+    sc = compute_min_mse_scaling(data, cb, 0, H=H)
+    assert len(sc) == 20
+    H = random_psd_matrix(20, 10)
+    sc = compute_min_mse_scaling(data, cb, 1, H=H)
+    assert len(sc) == 50
+
+
+def test_min_mse_scaling_obq():
+    data = np.random.randn(20, 50).astype(np.float32)
+    cb = Codebook.uniform(9, -2, 2)
+    H = random_psd_matrix(50, 10, damp=1.0e-6)
+    sc = compute_min_mse_scaling(data, cb, 0, H=H, obq=True)
+    assert len(sc) == 20
+    H = random_psd_matrix(20, 10, damp=1.0e-6)
+    sc = compute_min_mse_scaling(data, cb, 1, H=H, obq=True)
+    assert len(sc) == 50
