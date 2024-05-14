@@ -5,7 +5,7 @@ def random_psd_matrix(size, rank, damp=0.0):
     """
     Generate a random positive semidefinite matrix of a given size from the Wishart distribution.
     """
-    A = np.random.randn(size, rank)
+    A = np.random.randn(size, rank).astype(np.float32)
     H = np.matmul(A, A.T)
     dampval = damp * np.linalg.norm(H, ord=2, axis=1)
     return H + dampval * np.eye(size)
@@ -57,17 +57,23 @@ def _quantize_opt_core(W, Hinv, quantizer):
     return (Q, E)
 
 
-def _quantize_opt_block(W, Hinv, quantizer, block_size):
+def _quantize_opt_block(W, Hinv, quantizer, min_block_size, num_blocks):
     """
     Quantization algorithm using block operations for speed.
     """
+    size = W.shape[1]
+    if size <= min_block_size:
+        return _quantize_opt_core(W, Hinv, quantizer)
     Q = W.copy()
     E = np.zeros(W.shape, dtype=np.float32)
+    block_size = max((size + num_blocks - 1) // num_blocks, min_block_size)
     for i in range(0, W.shape[1], block_size):
         # Quantize the block
-        e = min(i + block_size, W.shape[1])
+        e = min(i + block_size, size)
         w = Q[:, i:e]
-        q, err = _quantize_opt_core(w, Hinv[i:e, i:e], quantizer)
+        q, err = _quantize_opt_block(
+            w, Hinv[i:e, i:e], quantizer, min_block_size, num_blocks
+        )
         E[:, i:e] = err
         Q[:, i:e] = q
         # Now correct the error
@@ -75,7 +81,7 @@ def _quantize_opt_block(W, Hinv, quantizer, block_size):
     return (Q, E)
 
 
-def _quantize_opt_ordered(W, H, quantizer, order, block_size):
+def _quantize_opt_ordered(W, H, quantizer, order, min_block_size, num_blocks):
     """
     Apply quantization optimization with a given ordering.
     """
@@ -85,14 +91,14 @@ def _quantize_opt_ordered(W, H, quantizer, order, block_size):
 
     # Apply the algorithm itself
     Hinv = compute_hessian_chol(H)
-    Q, _ = _quantize_opt_block(W, Hinv, quantizer, block_size)
+    Q, _ = _quantize_opt_block(W, Hinv, quantizer, min_block_size, num_blocks)
 
     # Reverse reordering
     Q = Q[:, np.argsort(order)]
     return Q
 
 
-def quantize_opt(W, H, quantizer, act_order=True, block_size=128):
+def quantize_opt(W, H, quantizer, act_order=True, min_block_size=32, num_blocks=8):
     """
     Quantize the weights with the given quantizer, minimizing the squared error using a GPTQ-like algorithm.
 
@@ -106,6 +112,7 @@ def quantize_opt(W, H, quantizer, act_order=True, block_size=128):
     assert H.ndim == 2
     assert H.shape[0] == H.shape[1]
     assert H.shape[0] == W.shape[1]
+    assert min_block_size >= 1
     W = W.astype(np.float32)
     H = H.astype(np.float32)
 
@@ -115,6 +122,6 @@ def quantize_opt(W, H, quantizer, act_order=True, block_size=128):
     else:
         order = np.arange(W.shape[1])
 
-    Q = _quantize_opt_ordered(W, H, quantizer, order, block_size)
+    Q = _quantize_opt_ordered(W, H, quantizer, order, min_block_size, num_blocks)
 
     return Q
