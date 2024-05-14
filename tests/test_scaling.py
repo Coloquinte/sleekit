@@ -1,12 +1,13 @@
 import numpy as np
 
 from sleekit.codebook import Codebook
-from sleekit.obq import random_psd_matrix
+from sleekit.obq import quantization_error, random_psd_matrix
 from sleekit.scaling import (
     compute_norm_scaling,
     apply_scaling,
     compute_non_saturating_scaling,
     compute_min_mse_scaling,
+    quantize_with_scaling,
 )
 
 
@@ -122,3 +123,25 @@ def test_min_mse_scaling_obq():
     H = random_psd_matrix(20, 10, damp=1.0e-6)
     sc = compute_min_mse_scaling(data, cb, 1, H=H, obq=True)
     assert len(sc) == 50
+
+
+def test_min_mse_scaling_quality():
+    size = 100
+    data = np.random.randn(20, size).astype(np.float32)
+    cb = Codebook.uniform(9, -3, 3)
+    H = random_psd_matrix(size, 10, damp=1.0e-6)
+    sc_base = compute_min_mse_scaling(data, cb, 0)
+    sc_diag = compute_min_mse_scaling(data, cb, 0, H=np.diag(H))
+    sc_hessian = compute_min_mse_scaling(data, cb, 0, H=H)
+    sc_obq = compute_min_mse_scaling(data, cb, 0, H=H, obq=True)
+    q_base = quantize_with_scaling(data, sc_base, cb)
+    q_diag = quantize_with_scaling(data, sc_diag, cb)
+    q_hessian = quantize_with_scaling(data, sc_hessian, cb)
+    q_obq = quantize_with_scaling(data, sc_obq, cb, H=H)
+    err_base = quantization_error(q_base, data, H)
+    err_diag = quantization_error(q_diag, data, H)
+    err_hessian = quantization_error(q_hessian, data, H)
+    err_obq = quantization_error(q_obq, data, H)
+    assert err_hessian <= err_base
+    assert err_hessian <= err_diag
+    assert err_obq <= err_hessian
