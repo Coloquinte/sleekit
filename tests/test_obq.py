@@ -5,6 +5,7 @@ from sleekit.obq import (
     compute_hessian_chol,
     quantize_opt,
     quantization_error,
+    remove_input_bias,
 )
 
 
@@ -61,3 +62,14 @@ def test_blockobq():
             )
             # We may be unlucky for close to values close to a half-integer, but should be fine
             assert np.allclose(Q, Q_block)
+
+
+def test_input_bias_removal():
+    size = 64
+    rank = 128
+    A = np.random.randn(size, rank).astype(np.float32)
+    H = np.matmul(A, A.T)
+    input_bias = np.mean(A, axis=1)
+    removed_H = remove_input_bias(H, input_bias)
+    # Check that the matrix is still positive semidefinite
+    assert np.linalg.eigvalsh(removed_H).min() >= 0

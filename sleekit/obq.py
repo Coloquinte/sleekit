@@ -11,6 +11,24 @@ def random_psd_matrix(size, rank, damp=0.0):
     return H + dampval * np.eye(size)
 
 
+def remove_input_bias(H, input_bias):
+    """
+    Remove the effect of the input bias from the hessian, as it can be removed by bias correction.
+
+    The input bias is the mean of the input samples associated with each weight.
+    Mathematically, removing the bias B from the weight error E applies (I - diag(B)) to it.
+    We apply this factor to the hessian.
+    """
+    assert H.ndim == 2
+    assert input_bias.ndim == 1
+    sz = H.shape[0]
+    assert sz == H.shape[1]
+    assert sz == input_bias.shape[0]
+    scale = np.ones(sz, dtype=np.float32) - input_bias
+    scaled_H = np.expand_dims(scale, 0) * H * np.expand_dims(scale, 1)
+    return scaled_H
+
+
 def compute_hessian_chol(H):
     """
     Compute an upper cholesky factor of the inverse hessian.
