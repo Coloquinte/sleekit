@@ -79,6 +79,9 @@ def test_input_bias_removal():
     unbiased_H = np.matmul(unbiased_X, unbiased_X.T)
     # Check that they are similar
     assert np.allclose(removed_H, unbiased_H)
+    # Check that they are positive semidefinite
+    assert np.all(np.linalg.eigvalsh(H) >= 0)
+    assert np.all(np.linalg.eigvalsh(removed_H) >= 0)
 
     # Bias removal when the samples are averaged
     X = np.random.randn(size, samples)
@@ -91,6 +94,9 @@ def test_input_bias_removal():
     unbiased_H = np.matmul(unbiased_X, unbiased_X.T) / samples
     # Check that they are similar
     assert np.allclose(removed_H, unbiased_H)
+    # Check that they are positive semidefinite
+    assert np.all(np.linalg.eigvalsh(H) >= 0)
+    assert np.all(np.linalg.eigvalsh(removed_H) >= 0)
 
     # Library implementation is for averaged samples
     library_H = remove_input_bias(H, input_bias)
