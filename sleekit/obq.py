@@ -15,18 +15,14 @@ def remove_input_bias(H, input_bias):
     """
     Remove the effect of the input bias from the hessian, as it can be removed by bias correction.
 
-    The input bias is the mean of the input samples associated with each weight.
-    Mathematically, removing the bias B from the weight error E applies (I - diag(B)) to it.
-    We apply this factor to the hessian.
+    The hessian is the mean of the hessian, and the input bias is the mean of the input samples.
+    The error due to this bias can be compensated in the bias of the layer, a technique known as bias correction.
     """
     assert H.ndim == 2
     assert input_bias.ndim == 1
-    sz = H.shape[0]
-    assert sz == H.shape[1]
-    assert sz == input_bias.shape[0]
-    scale = np.ones(sz, dtype=np.float32) - input_bias
-    scaled_H = np.expand_dims(scale, 0) * H * np.expand_dims(scale, 1)
-    return scaled_H
+    assert H.shape[0] == H.shape[1]
+    assert H.shape[0] == input_bias.shape[0]
+    return H - np.outer(input_bias, input_bias)
 
 
 def compute_hessian_chol(H):

@@ -65,11 +65,33 @@ def test_blockobq():
 
 
 def test_input_bias_removal():
-    size = 64
-    rank = 128
-    A = np.random.randn(size, rank).astype(np.float32)
-    H = np.matmul(A, A.T)
-    input_bias = np.mean(A, axis=1)
-    removed_H = remove_input_bias(H, input_bias)
-    # Check that the matrix is still positive semidefinite
-    assert np.linalg.eigvalsh(removed_H).min() >= 0
+    size = 16
+    samples = 32
+
+    # Bias removal when the samples are summed
+    X = np.random.randn(size, samples)
+    H = np.matmul(X, X.T)
+    input_bias = np.mean(X, axis=1)
+    # First way of computing bias removal
+    removed_H = H - samples * np.outer(input_bias, input_bias)
+    # Second way of computing bias removal
+    unbiased_X = X - np.expand_dims(input_bias, 1)
+    unbiased_H = np.matmul(unbiased_X, unbiased_X.T)
+    # Check that they are similar
+    assert np.allclose(removed_H, unbiased_H)
+
+    # Bias removal when the samples are averaged
+    X = np.random.randn(size, samples)
+    H = np.matmul(X, X.T) / samples
+    input_bias = np.mean(X, axis=1)
+    # First way of computing bias removal
+    removed_H = H - np.outer(input_bias, input_bias)
+    # Second way of computing bias removal
+    unbiased_X = X - np.expand_dims(input_bias, 1)
+    unbiased_H = np.matmul(unbiased_X, unbiased_X.T) / samples
+    # Check that they are similar
+    assert np.allclose(removed_H, unbiased_H)
+
+    # Library implementation is for averaged samples
+    library_H = remove_input_bias(H, input_bias)
+    assert np.allclose(removed_H, library_H)
