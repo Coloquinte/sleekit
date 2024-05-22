@@ -5,7 +5,7 @@ from sleekit.scaling import *
 import matplotlib.pyplot as plt
 import glob
 
-print("Layer MSE MSE+corr H H+corr OBQ OBQ+corr")
+print("Layer MSE MSE+corr MSE+chol MSE+chol+corr MSE+inv MSE+inv+corr")
 for hessian_name in sorted(glob.glob("data/**.quant_hessian.npy")):
     name = hessian_name.replace("model.decoder.layers.", "")
     name = name.replace(".quant_hessian.npy", "")
@@ -30,25 +30,19 @@ for hessian_name in sorted(glob.glob("data/**.quant_hessian.npy")):
     q_mse = quantize_with_scaling(weight, sc_mse, cb, H=H)
     err_mse = quantization_error(q_mse, weight, removed_H)
     print(f"{err_mse}", end=" ")
-    q_mse_corr = quantize_with_scaling(weight, sc_mse, cb, H=removed_H)
-    err_mse_corr = quantization_error(q_mse_corr, weight, removed_H)
-    print(f"{err_mse_corr}", end=" ")
-    sc_hessian = compute_min_mse_scaling(
-        weight, cb, 0, H=H, min_factor=0.5, grid_size=10
-    )
-    q_hessian = quantize_with_scaling(weight, sc_hessian, cb, H=H)
-    err_hessian = quantization_error(q_hessian, weight, removed_H)
-    print(f"{err_hessian}", end=" ")
-    q_hessian_corr = quantize_with_scaling(weight, sc_hessian, cb, H=removed_H)
-    err_hessian_corr = quantization_error(q_hessian_corr, weight, removed_H)
-    print(f"{err_hessian_corr}", end=" ")
-    sc_obq = compute_min_mse_scaling(
-        weight, cb, 0, H=H, obq=True, min_factor=0.5, grid_size=10
-    )
-    q_obq = quantize_with_scaling(weight, sc_obq, cb, H=H)
-    err_obq = quantization_error(q_obq, weight, removed_H)
-    print(f"{err_obq}", end=" ")
-    q_obq_corr = quantize_with_scaling(weight, sc_obq, cb, H=removed_H)
-    err_obq_corr = quantization_error(q_obq_corr, weight, removed_H)
-    print(f"{err_obq_corr}", end=" ")
+    q_mse = quantize_with_scaling(weight, sc_mse, cb, H=removed_H)
+    err_mse = quantization_error(q_mse, weight, removed_H)
+    print(f"{err_mse}", end=" ")
+    q_mse = quantize_with_scaling(weight, sc_mse, cb, H=H, act_order=2)
+    err_mse = quantization_error(q_mse, weight, removed_H)
+    print(f"{err_mse}", end=" ")
+    q_mse = quantize_with_scaling(weight, sc_mse, cb, H=removed_H, act_order=2)
+    err_mse = quantization_error(q_mse, weight, removed_H)
+    print(f"{err_mse}", end=" ")
+    q_mse = quantize_with_scaling(weight, sc_mse, cb, H=H, act_order=3)
+    err_mse = quantization_error(q_mse, weight, removed_H)
+    print(f"{err_mse}", end=" ")
+    q_mse = quantize_with_scaling(weight, sc_mse, cb, H=removed_H, act_order=3)
+    err_mse = quantization_error(q_mse, weight, removed_H)
+    print(f"{err_mse}", end=" ")
     print()
