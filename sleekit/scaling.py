@@ -47,16 +47,25 @@ def compute_non_saturating_scaling(data, codebook, axis=0):
     return maxdata / maxcode
 
 
-def quantize_with_scaling(data, scale, codebook, H=None):
+def quantize_with_scaling(data, scale, quantizer, H=None, act_order=1):
+    """
+    Quantize the weights after applying a scaling factor.
+
+    :param data: Weights (2D array)
+    :param quantizer: Function that quantizes its argument and returns it
+    :param H: Hessian of the error (optional 2D array)
+    :param act_order: Ordering heuristic to use
+    :returns: Quantized weights
+    """
     assert data.ndim == 2
     assert scale.ndim == 1
     assert data.shape[0] == scale.size
     quant = apply_scaling(data, scale, 0)
     if H is not None:
         # TODO: do the inverse hessian computation only once
-        quant = quantize_opt(quant, H, codebook)
+        quant = quantize_opt(quant, H, quantizer, act_order=act_order)
     else:
-        quant = codebook(quant)
+        quant = quantizer(quant)
     quant = apply_scaling(quant, 1 / scale, 0)
     return quant
 

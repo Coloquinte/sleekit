@@ -112,14 +112,44 @@ def _quantize_opt_ordered(W, H, quantizer, order, min_block_size, num_blocks):
     return Q
 
 
-def quantize_opt(W, H, quantizer, act_order=True, min_block_size=32, num_blocks=8):
+def _cholesky_ordering(H):
+    """
+    Compute a good ordering of the matrix based on pivoted Cholesky decomposition.
+    The diagonal of the Cholesky decomposition gives the conditional variance with respect to the previous variables.
+    We pick a greedy ordering that maximizes the diagonal elements of the Cholesky decomposition.
+    This is better than the GPTQ ordering, which is based on the diagonal of the Hessian, as this factors prior decisions in the ordering.
+    """
+    n = H.shape[0]
+    orig = H
+    H = H.copy()
+    L = H.copy()
+    order = np.arange(n)
+    for k in range(n):
+        # Find the pivot
+        pivot = np.argmax(np.abs(np.diag(L)[k:])) + k
+        # Swap rows and columns
+        L[[k, pivot], :] = L[[pivot, k], :]
+        L[:, [k, pivot]] = L[:, [pivot, k]]
+        order[[k, pivot]] = order[[pivot, k]]
+        # Update the matrix
+        b = L[k, k + 1 :]
+        L[k + 1 :, k + 1 :] -= np.outer(b, b) / L[k, k]
+        L[k, k] = np.sqrt(L[k, k])
+        L[k, k + 1 :] = 0
+        L[k + 1 :, k] /= L[k, k]
+    # Should work in general despite imprecisions
+    assert np.allclose(L @ L.T, H[order][:, order], rtol=1.0e-4, atol=1.0e-4)
+    return order
+
+
+def quantize_opt(W, H, quantizer, act_order=1, min_block_size=32, num_blocks=8):
     """
     Quantize the weights with the given quantizer, minimizing the squared error using a GPTQ-like algorithm.
 
     :param W: Weights (2D array)
     :param H: Hessian of the error (2D array)
     :param quantizer: Function that quantizes its argument and returns it
-    :param act_order: Whether to use GPTQ's ordering heuristic
+    :param act_order: Ordering heuristic to use
     :returns: Quantized weights
     """
     assert W.ndim == 2
@@ -131,7 +161,11 @@ def quantize_opt(W, H, quantizer, act_order=True, min_block_size=32, num_blocks=
     H = H.astype(np.float32)
 
     # Reorder if required, by order of decreasing diagonal elements
-    if act_order:
+    if act_order == 3:
+        order = np.argsort(np.diag(np.linalg.inv(H)))
+    elif act_order == 2:
+        order = _cholesky_ordering(H)
+    elif act_order is True or act_order == 1:
         order = np.argsort(-np.diag(H))
     else:
         order = np.arange(W.shape[1])

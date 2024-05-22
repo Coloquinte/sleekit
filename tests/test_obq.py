@@ -38,14 +38,18 @@ def test_obq():
     quantizer = lambda x: np.round(x)
     Q_ordered = quantize_opt(W, H, quantizer, act_order=True, min_block_size=size)
     Q_unordered = quantize_opt(W, H, quantizer, act_order=False, min_block_size=size)
+    Q_cholesky = quantize_opt(W, H, quantizer, act_order=2, min_block_size=size)
     assert Q_unordered.shape == W.shape
     assert Q_ordered.shape == W.shape
+    assert Q_cholesky.shape == W.shape
     error_direct = quantization_error(W, quantizer(W), H)
     error_ordered = quantization_error(W, Q_ordered, H)
     error_unordered = quantization_error(W, Q_unordered, H)
+    error_cholesky = quantization_error(W, Q_cholesky, H)
     # We may be unlucky but given the sizes involved we should be fine
     assert error_unordered <= error_direct
     assert error_ordered <= error_unordered
+    assert error_cholesky <= error_unordered
 
 
 def test_blockobq():
