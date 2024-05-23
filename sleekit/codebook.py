@@ -205,9 +205,10 @@ def lloyd_max(
 ):
     """
     Lloyd-Max algorithm for scalar quantization.
-    Returns a codebook that minimizes a combination of the mse and the etropy.
+    Returns a codebook that minimizes a combination of the mse and the entropy.
     """
     data = np.reshape(data, (-1,))
+    data = np.sort(data)
     if random_init:
         codebook = Codebook.random(data, codebook_size)
     else:
