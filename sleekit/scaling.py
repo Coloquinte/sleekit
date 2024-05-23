@@ -32,7 +32,8 @@ def compute_norm_scaling(data, axis=0):
     Compute a scaling factor over this axis to have squared average equal to 1.
     """
     other_axes = tuple(i for i in range(data.ndim) if i != axis)
-    return np.sqrt(np.mean(np.square(data), axis=other_axes))
+    sqnorm = np.mean(np.square(data), axis=other_axes)
+    return np.sqrt(np.maximum(sqnorm, 1.0e-16))
 
 
 def compute_non_saturating_scaling(data, codebook, axis=0):
