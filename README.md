@@ -19,19 +19,19 @@ Sleekit uses a generic quantization method. There are several steps to it:
 ### Choice of codebook
 
 Common quantization methods will use small integer weights for the codebook, but a good codebook is taylored to the data.
-Since we are aiming for the smallest size, we provide codebooks optimized for entropy coding. 
+Sleekit supports arbitrary codebooks, optimized either for fast inference, for lower error or for entropy coding.
 
 ### Weight scaling
 
 A good scaling factor minimizes the error introduced by quantization.
-This is usually done quickly but roughly: the error is evaluated on the weights.
-With sleekit, we introduce a more precise approach: the error is evaluated on the layer's result.
+This is usually done quickly but roughly, chosing the scaling factor that minimizes the error for the weights.
+With sleekit, we introduce a more precise approach, and pick the scaling factor that minimizes the error for the layer's result.
 
 ### Weight optimization
 
 The data received by a neural network layer contains a lot of correlation.
-In practice, this means that we can compensate part of the rounding errors by taking advantage of this correlation.
-Sleekit improves a little on the existing fast algorithms, and introduces a way to combine two of them for better results. 
+This means that we can compensate some of the error between correlated inputs, rounding the weights either up or down instead of to the nearest value.
+Sleekit improves a little on the existing fast algorithms, taking the effect of the layer's bias into account.
 
 ## References
 
