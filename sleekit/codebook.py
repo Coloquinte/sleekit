@@ -201,13 +201,23 @@ class Codebook:
 
 
 def lloyd_max(
-    data, codebook_size, lagrange_mult=0.0, max_iter=100, tol=1e-6, random_init=False
+    data,
+    codebook_size,
+    lagrange_mult=0.0,
+    max_iter=100,
+    tol=1e-6,
+    random_init=False,
+    sample_count=None,
 ):
     """
     Lloyd-Max algorithm for scalar quantization.
     Returns a codebook that minimizes a combination of the mse and the entropy.
     """
     data = np.reshape(data, (-1,))
+    if sample_count is not None:
+        nsamples = codebook_size * sample_count
+        if nsamples < len(data):
+            data = np.random.choice(data, nsamples, replace=False)
     data = np.sort(data)
     if random_init:
         codebook = Codebook.random(data, codebook_size)
