@@ -175,14 +175,23 @@ def quantize_opt(W, H, quantizer, act_order=1, min_block_size=32, num_blocks=8):
     W = W.astype(np.float32)
     H = H.astype(np.float32)
 
-    # Reorder if required, by order of decreasing diagonal elements
-    if act_order == 3:
+    if act_order == 6:
+        order = np.argsort(-np.diag(H) * np.mean(np.square(W), axis=0))
+    elif act_order == 5:
+        order = np.argsort(-np.diag(H) * np.mean(np.abs(W), axis=0))
+    elif act_order == 4:
+        order = np.argsort(-np.diag(H) * np.max(np.abs(W), axis=0))
+    elif act_order == 3:
+        # Reorder small diagonal values of the inverse first
         order = np.argsort(np.diag(np.linalg.inv(H)))
     elif act_order == 2:
+        # Reorder by large diagonal values on pivoted Cholesky
         order = _cholesky_ordering(H)
     elif act_order is True or act_order == 1:
+        # Reorder large diagonal values first
         order = np.argsort(-np.diag(H))
     else:
+        # No reordering
         order = np.arange(W.shape[1])
 
     Q = _quantize_opt_ordered(W, H, quantizer, order, min_block_size, num_blocks)
