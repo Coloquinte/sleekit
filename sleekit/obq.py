@@ -25,6 +25,21 @@ def remove_input_bias(H, input_bias):
     return H - np.outer(input_bias, input_bias)
 
 
+def remove_dead_values(H, W, pcdamp=0.01):
+    """
+    Make the Hessian diagonal non-zero, add dampening term, and zero out dead weights.
+    """
+    mean_diag = np.mean(np.diag(H))
+
+    # Remove dead elements
+    dead = np.diag(H) == 0
+    H[dead, dead] = mean_diag
+    W[:, dead] = 0
+
+    # Add dampening term
+    H += np.diag(np.full(H.shape[0], 0.01 * pcdamp * mean_diag))
+
+
 def compute_hessian_chol(H):
     """
     Compute an upper cholesky factor of the inverse hessian.
