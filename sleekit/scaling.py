@@ -39,13 +39,15 @@ def compute_norm_scaling(data, axis=0):
 def compute_non_saturating_scaling(data, codebook, axis=0):
     """
     Compute a scaling factor over this axis to have no saturation.
-
-    This yields a non-saturating scaling factor, but not necessarily the tightest one for non-symmetric codebook and data.
     """
-    maxcode = np.maximum(np.abs(codebook.values).max(), np.float32(1.0e-16))
+    if codebook.min() >= 0 or codebook.max() <= 0:
+        raise RuntimeError("Codebook should have both negative and positive values.")
     other_axes = tuple(i for i in range(data.ndim) if i != axis)
-    maxdata = np.maximum(np.abs(data).max(axis=other_axes), np.float32(1.0e-16))
-    return maxdata / maxcode
+    mindata, maxdata = data.min(axis=other_axes), data.max(axis=other_axes)
+    mincode, maxcode = codebook.min(), codebook.max()
+    scale = np.maximum(maxdata / maxcode, mindata / mincode)
+    scale = np.maximum(scale, np.float32(1.0e-16))
+    return scale
 
 
 def quantize_with_scaling(data, scale, quantizer, H=None, act_order=1):

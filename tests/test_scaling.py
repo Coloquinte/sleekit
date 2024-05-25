@@ -66,8 +66,8 @@ def test_non_saturating_scaling():
     cb = Codebook([-1.0, 0.0, 10.0, 20.0])
     sc0 = compute_non_saturating_scaling(data, cb, 0)
     sc1 = compute_non_saturating_scaling(data, cb, 1)
-    assert np.allclose(sc0, [1.0, 0.5, 0.2, 0.5e-18, 50.0, 50.0])
-    assert np.allclose(sc1, [0.25, 0.5, 5.0, 50.0])
+    assert np.allclose(sc0, [20, 10, 4, 1e-16, 50, 50])
+    assert np.allclose(sc1, [1, 0.5, 20, 50])
 
 
 def test_non_saturating_scaling_high_dim():
