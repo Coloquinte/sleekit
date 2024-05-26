@@ -7,18 +7,28 @@ import tqdm
 
 import argparse
 
-parser = argparse.ArgumentParser()
-parser.add_argument("dir", type=str)
+parser = argparse.ArgumentParser(
+    description="Show the distribution of weight values after scaling"
+)
+parser.add_argument("dir", type=str, help="Directory containing the weights")
 parser.add_argument(
     "--scaling",
     type=str,
     choices=["norm", "max", "mse", "hessian", "obq"],
     default="norm",
+    help="Scaling method to use",
 )
-parser.add_argument("--grid-size", type=int, default=100)
-parser.add_argument("--codebook-size", type=int, default=16)
-parser.add_argument("--save-figure", type=str)
-parser.add_argument("--save-data", type=str)
+parser.add_argument(
+    "--grid-size", type=int, default=100, help="Grid size for error minimization"
+)
+parser.add_argument(
+    "--codebook-size",
+    type=int,
+    default=16,
+    help="Size of the codebook for error minimization",
+)
+parser.add_argument("--save-figure", type=str, help="Save the figure to this file")
+parser.add_argument("--save-data", type=str, help="Save the numpy data to this file")
 args = parser.parse_args()
 
 data = []
