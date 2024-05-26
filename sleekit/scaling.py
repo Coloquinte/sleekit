@@ -73,19 +73,19 @@ def quantize_with_scaling(data, scale, quantizer, H=None, act_order=1):
     return quant
 
 
-def _compute_mse(err, H):
+def _compute_mse(H, E):
     if H is None:
-        return np.sum(np.square(err), axis=1)
+        return np.sum(np.square(E), axis=1)
     elif H.ndim == 1:
         # Diagonal hessian
-        assert err.shape[1] == H.shape[0]
-        return np.sum(np.expand_dims(H, 0) * np.square(err), axis=1)
+        assert E.shape[1] == H.shape[0]
+        return np.sum(np.expand_dims(H, 0) * np.square(E), axis=1)
     else:
         # Full hessian
         assert H.ndim == 2
-        assert err.shape[1] == H.shape[0]
+        assert E.shape[1] == H.shape[0]
         assert H.shape[1] == H.shape[0]
-        return np.einsum("ij,...i,...j", H, err, err)
+        return ((E @ H) * E).sum(axis=-1)
 
 
 def compute_min_mse_scaling(
@@ -126,7 +126,7 @@ def compute_min_mse_scaling(
         quant = quantize_with_scaling(
             flat_data, scale, codebook, H if obq and H.ndim == 2 else None
         )
-        error = _compute_mse(quant - flat_data, H)
+        error = _compute_mse(H, quant - flat_data)
         better = error < best_error
         best_error[better] = error[better]
         best_choice[better] = s

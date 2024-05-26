@@ -65,7 +65,8 @@ def quantization_error(W, Q, H):
     Compute the error between two weight matrices given the hessian
     """
     E = W - Q
-    return np.einsum("ij,...i,...j", H, E, E).mean()
+    # Einsum is much too slow: np.einsum("ij,...i,...j", H, E, E).mean()
+    return ((E @ H) * E).sum(axis=-1).mean()
 
 
 def _quantize_opt_core(W, Hinv, quantizer):
