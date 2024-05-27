@@ -80,7 +80,7 @@ for root in it:
     err_with_bias = gptq_with_bias_error / gptq_error
     rel_error_plus_bias.append(err_plus_bias)
     rel_error_with_bias.append(err_with_bias)
-    rel_error_best.append(min(err_plus_bias, err_with_bias))
+    rel_error_best.append(min(err_plus_bias, err_with_bias, 1.0))
 
 plt.plot(np.sort(rel_error_plus_bias), label="Bias correction after GPTQ")
 plt.plot(np.sort(rel_error_with_bias), label="Bias correction inside GPTQ")
