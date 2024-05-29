@@ -49,19 +49,10 @@ We test three different ways to update the bias:
 
 <!-- TODO: figure and conclusion -->
 
-### Codebook
-
-For simplicity, many works use uniform quantization i.e. codebooks of consecutive integers.
-More recent works introduce hand-picked codebooks (NF4), or vector quantization (GPTVQ).
-NF4 makes the assumption that the data is gaussian-distributed, and it is possible to improve it a lot without going all the way to vector quantization.
-
-<!-- TODO: figure and conclusion -->
-
-
 ### Things that do not work
 
 The following approaches did not yield promising results and were abandoned:
-* Improved generic codebooks: the data is far from being gaussian-distributed, but codebooks trained on actual data are actually close to a NF4 codebook. The use of a different generic codebook is unlikely to yield large improvements.
+* Improved codebooks: the data is far from being gaussian-distributed, but training a codebook naively is not better than a NF4 codebook.
 * Entropy coding: it is tempting to combine codebook optimization with entropy coding to reduce storage needs. However, the gain in entropy is not huge compared to an error-optimized codebook, and does not seem worth the effort.
 * GPTQ reordering: other heuristic orderings for GPTQ do not bring a consistent reduction in layer error compared to using the diagonal of the hessian as the original paper does.
 * More complex algorithms for weight optimization: it just doesn't scale, but if you want to go in this direction you probably want to use the [MQLib](https://github.com/MQLib/MQLib) as a solver.
