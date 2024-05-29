@@ -61,10 +61,9 @@ class Codebook:
         vals = np.digitize(data, self.thresholds)
         if len(self) <= 2**8:
             return vals.astype(np.uint8)
-        elif len(self) <= 2**16:
+        if len(self) <= 2**16:
             return vals.astype(np.uint16)
-        else:
-            return vals.astype(np.uint32)
+        return vals.astype(np.uint32)
 
     def quantize_value(self, data):
         """
@@ -106,7 +105,7 @@ class Codebook:
         """
         labels = self.quantize_index(data)
         ret = []
-        for k, v in enumerate(self.values):
+        for k in range(len(self.values)):
             d = data[labels == k]
             if len(d) != 0:
                 # Typical case: we use the centroid
@@ -177,12 +176,12 @@ class Codebook:
         )
 
     @staticmethod
-    def uniform(codebook_size, min, max):
+    def uniform(codebook_size, min_val, max_val):
         """
         Create a uniform codebook.
         """
-        assert min <= max
-        return Codebook(np.linspace(min, max, codebook_size))
+        assert min_val <= max_val
+        return Codebook(np.linspace(min_val, max_val, codebook_size))
 
     @staticmethod
     def nf4():

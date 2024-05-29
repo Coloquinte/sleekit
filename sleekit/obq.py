@@ -136,7 +136,6 @@ def _cholesky_ordering(H):
     This is better than the GPTQ ordering, which is based on the diagonal of the Hessian, as this factors prior decisions in the ordering.
     """
     n = H.shape[0]
-    orig = H
     H = H.copy()
     L = H.copy()
     order = np.arange(n)

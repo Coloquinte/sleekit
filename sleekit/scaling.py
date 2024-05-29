@@ -76,16 +76,15 @@ def quantize_with_scaling(data, scale, quantizer, H=None, act_order=1):
 def _compute_mse(H, E):
     if H is None:
         return np.sum(np.square(E), axis=1)
-    elif H.ndim == 1:
+    if H.ndim == 1:
         # Diagonal hessian
         assert E.shape[1] == H.shape[0]
         return np.sum(np.expand_dims(H, 0) * np.square(E), axis=1)
-    else:
-        # Full hessian
-        assert H.ndim == 2
-        assert E.shape[1] == H.shape[0]
-        assert H.shape[1] == H.shape[0]
-        return ((E @ H) * E).sum(axis=-1)
+    # Full hessian
+    assert H.ndim == 2
+    assert E.shape[1] == H.shape[0]
+    assert H.shape[1] == H.shape[0]
+    return ((E @ H) * E).sum(axis=-1)
 
 
 def compute_min_mse_scaling(
