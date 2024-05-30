@@ -60,6 +60,41 @@ def compute_hessian_chol(H):
     return np.ascontiguousarray(H)
 
 
+def compute_sensitivity(hessian):
+    """
+    Return a measure for the sensitivity of each weight to errors.
+    This runs the a quick version of the correction algorithm for each weight and returns the remaining error.
+    """
+    hessian_inv = np.linalg.inv(hessian)
+    sensitivity = np.zeros(hessian.shape[0], dtype=np.float32)
+    for i in range(hessian.shape[0]):
+        # We consider an error of 1 on element i and compute the correction
+        # We can write the hessian blockwise on dimension i:
+        #   a b
+        #   b H
+        # Correction minimizes x H x + 2 b x + a
+        # So the correction vector is x = -solve(H, b)
+        # So the error becomes a - b solve(h, b)
+        # We apply the Woodbury matrix identity to solve this system from the full inverse
+        b = hessian[i, :]
+        diff = -b
+        diff[i] /= 2
+        diff[i] += 0.5
+        # Rank-2 update that removes the row and column i
+        U = np.zeros((hessian.shape[0], 2), dtype=np.float32)
+        V = np.zeros((2, hessian.shape[0]), dtype=np.float32)
+        U[:, 0] = diff
+        V[0, i] = 1
+        V[1, :] = diff
+        U[i, 1] = 1
+        # Woodbury identity to solve A + UV
+        denom = np.linalg.inv(np.eye(2) + V @ hessian_inv @ U)
+        sol = hessian_inv @ b - hessian_inv @ (U @ (denom @ (V @ (hessian_inv @ b))))
+        # Value of the solution
+        sensitivity[i] = hessian[i, i] - np.sum(np.delete(b * sol, i))
+    return sensitivity
+
+
 def quantization_error(W, Q, H):
     """
     Compute the error between two weight matrices given the hessian
