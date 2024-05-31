@@ -93,7 +93,7 @@ def compute_min_mse_scaling(
     axis=0,
     H=None,
     obq=False,
-    min_factor=0.3,
+    min_factor=0.05,
     max_factor=1.0,
     grid_size=100,
 ):
