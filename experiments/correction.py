@@ -12,20 +12,34 @@ parser = argparse.ArgumentParser(
 )
 parser.add_argument("dir", type=str, help="Directory containing the weights")
 parser.add_argument(
+    "--codebook-size", type=int, default=16, help="Size of the codebook to use"
+)
+parser.add_argument("--damp", type=float, default=0.01, help="Hessian dampening")
+parser.add_argument("--save-figure", type=str, help="Save the figure to this file")
+
+gp = parser.add_argument_group("Scaling")
+gp.add_argument(
     "--scaling",
     type=str,
     choices=["mse", "max", "hessian", "obq"],
     default="mse",
     help="Scaling method to use",
 )
-parser.add_argument(
-    "--codebook-size", type=int, default=16, help="Size of the codebook to use"
-)
-parser.add_argument(
+gp.add_argument(
     "--grid-size", type=int, default=100, help="Grid size for error minimization"
 )
-parser.add_argument("--damp", type=float, default=0.01, help="Hessian dampening")
-parser.add_argument("--save-figure", type=str, help="Save the figure to this file")
+gp.add_argument(
+    "--min-factor",
+    type=float,
+    default=0.05,
+    help="Minimum scaling factor for error minimization",
+)
+gp.add_argument(
+    "--max-factor",
+    type=float,
+    default=1.0,
+    help="Maximum scaling factor for error minimization",
+)
 args = parser.parse_args()
 
 cb = Codebook.uniform(args.codebook_size, -1, 1)
@@ -52,14 +66,33 @@ for root in it:
     corrected_hessian = remove_input_bias(hessian, mean)
 
     if args.scaling == "mse":
-        sc = compute_min_mse_scaling(weight, cb, grid_size=args.grid_size)
+        sc = compute_min_mse_scaling(
+            weight,
+            cb,
+            grid_size=args.grid_size,
+            min_factor=args.min_factor,
+            max_factor=args.max_factor,
+        )
     elif args.scaling == "max":
         sc = compute_non_saturating_scaling(weight, cb)
     elif args.scaling == "hessian":
-        sc = compute_min_mse_scaling(weight, cb, H=hessian, grid_size=args.grid_size)
+        sc = compute_min_mse_scaling(
+            weight,
+            cb,
+            H=hessian,
+            grid_size=args.grid_size,
+            min_factor=args.min_factor,
+            max_factor=args.max_factor,
+        )
     elif args.scaling == "obq":
         sc = compute_min_mse_scaling(
-            weight, cb, H=hessian, grid_size=args.grid_size, obq=True
+            weight,
+            cb,
+            H=hessian,
+            obq=True,
+            grid_size=args.grid_size,
+            min_factor=args.min_factor,
+            max_factor=args.max_factor,
         )
     else:
         raise RuntimeError(f"Unknown scaling {args.scaling}")
