@@ -1,0 +1,14 @@
+cff-version: 1.2.0
+title: Sleekit, Bag of Tricks for NN Quantization
+type: software
+authors:
+  - family-names: Gouvine
+    given-names: Gabriel
+    orcid: 0000-0003-3404-6659
+repository-code: https://github.com/Coloquinte/Sleekit
+keywords:
+  - neural network
+  - quantization
+  - inference
+license: MIT
+date-released: 2024-06-01
