@@ -40,11 +40,6 @@ gp.add_argument(
 )
 gp = parser.add_argument_group("Additional experiments")
 gp.add_argument(
-    "--run-sensitivity",
-    action="store_true",
-    help="Run experiments with the slower sensitivity scaling",
-)
-gp.add_argument(
     "--run-hessian",
     action="store_true",
     help="Run experiments with the slower full hessian scaling",
@@ -68,14 +63,11 @@ roots = sorted(
 
 rel_error_diag = []
 rel_error_hessian = []
-rel_error_sensitivity = []
 rel_error_obq = []
 rel_error_best = []
 
 
 msg = "Data\tMax\tMSE\tDiag"
-if args.run_sensitivity:
-    msg += "\tSensitivity"
 if args.run_hessian:
     msg += "\tHessian"
 if args.run_obq_aware:
@@ -96,7 +88,6 @@ for root in it:
         eval_hessian = remove_input_bias(hessian, mean)
     else:
         eval_hessian = hessian
-    sensitivity_diag = compute_sensitivity(eval_hessian)
 
     sc = compute_non_saturating_scaling(weight, cb)
     max_weight = quantize_with_scaling(weight, sc, cb, H=gptq_hessian)
@@ -127,25 +118,6 @@ for root in it:
     rel_error_diag.append(err_diag)
     best_error = min(best_error, err_diag)
     msg = f"{name}\t{max_error}\t{mse_error}\t{diag_error}"
-
-    if args.run_sensitivity:
-        sensitivity_diag = compute_sensitivity(eval_hessian)
-        sc = compute_min_mse_scaling(
-            weight,
-            cb,
-            grid_size=args.grid_size,
-            H=sensitivity_diag,
-            min_factor=args.min_factor,
-            max_factor=args.max_factor,
-        )
-        sensitivity_weight = quantize_with_scaling(weight, sc, cb, H=gptq_hessian)
-        sensitivity_error = quantization_error(
-            weight, sensitivity_weight, H=eval_hessian
-        )
-        err_sensitivity = sensitivity_error / mse_error
-        rel_error_sensitivity.append(err_sensitivity)
-        best_error = min(best_error, err_sensitivity)
-        msg += f"\t{sensitivity_error}"
 
     if args.run_hessian:
         sc = compute_min_mse_scaling(
@@ -184,8 +156,6 @@ for root in it:
     rel_error_best.append(best_error)
 
 plt.plot(np.sort(rel_error_diag), label="Diagonal hessian scaling")
-if args.run_sensitivity:
-    plt.plot(np.sort(rel_error_sensitivity), label="Sensitivity scaling")
 if args.run_hessian:
     plt.plot(np.sort(rel_error_hessian), label="Hessian scaling")
 if args.run_obq_aware:
