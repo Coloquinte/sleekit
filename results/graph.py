@@ -57,3 +57,29 @@ plt.plot(obq, label="Exhaustive search")
 plt.legend()
 plt.savefig("results/scaling.png")
 #plt.show()
+plt.clf()
+
+data = pandas.read_csv("results/compare.csv", sep="\t")
+standard = [1.0 for d in data["Standard"]]
+sleekit = sorted(data["Sleekit"] / data["Standard"], reverse=True)
+
+plt.title("Relative error with Sleekit; less is better")
+plt.xlabel("Layers")
+plt.ylabel("Relative error (%)")
+plt.yscale("log")
+plt.ylim(bottom=0.25, top=2.0)
+
+yticks = [0.3, 0.4, 0.5, 0.6, 0.8, 1.0, 1.2, 1.5, 2.0]
+plt.gca().set_yticks([])
+plt.gca().set_yticks([], minor=True)
+plt.gca().set_yticks(yticks)
+plt.gca().set_yticklabels([f"{100 * (t - 1):+.0f}%" for t in yticks])
+
+plt.plot(standard, label="No change")
+plt.plot(sleekit, label="Sleekit")
+plt.plot(diag, label="Only diagonal scaling")
+plt.plot(plus_bias, label="Only bias correction")
+plt.legend()
+plt.savefig("results/compare.png")
+#plt.show()
+plt.clf()
