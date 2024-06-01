@@ -16,7 +16,6 @@ parser.add_argument(
     "--codebook-size", type=int, default=16, help="Size of the codebook to use"
 )
 parser.add_argument("--damp", type=float, default=0.01, help="Hessian dampening")
-parser.add_argument("--save-figure", type=str, help="Save the figure to this file")
 gp = parser.add_argument_group("Optimization")
 gp.add_argument(
     "--grid-size", type=int, default=100, help="Grid size for error minimization"
@@ -47,7 +46,7 @@ roots = sorted(
 
 rel_error = []
 
-msg = "Data\tStandard\tSleekit"
+msg = "Data\tStandard\tCorrection\tScaling\tSleekit\tIntegrated"
 
 print(msg)
 
@@ -69,6 +68,18 @@ for root in it:
     )
     standard_weight = quantize_with_scaling(weight, sc, cb, H=standard_hessian)
     standard_error = quantization_error(weight, standard_weight, H=standard_hessian)
+    correction_error = quantization_error(weight, standard_weight, H=corrected_hessian)
+
+    sc = compute_min_mse_scaling(
+        weight,
+        cb,
+        grid_size=args.grid_size,
+        H=np.diag(standard_hessian),
+        min_factor=args.min_factor,
+        max_factor=args.max_factor,
+    )
+    scaling_weight = quantize_with_scaling(weight, sc, cb, H=standard_hessian)
+    scaling_error = quantization_error(weight, scaling_weight, H=standard_hessian)
 
     sc = compute_min_mse_scaling(
         weight,
@@ -80,19 +91,8 @@ for root in it:
     )
     sleekit_weight = quantize_with_scaling(weight, sc, cb, H=standard_hessian)
     sleekit_error = quantization_error(weight, sleekit_weight, H=corrected_hessian)
-    rel_error.append(sleekit_error / standard_error)
-    msg = f"{name}\t{standard_error}\t{sleekit_error}"
+    integrated_weight = quantize_with_scaling(weight, sc, cb, H=corrected_hessian)
+    integrated_error = quantization_error(weight, integrated_weight, H=corrected_hessian)
+    msg = f"{name}\t{standard_error}\t{correction_error}\t{scaling_error}\t{sleekit_error}\t{integrated_error}"
 
     it.write(msg)
-
-plt.plot(np.sort(rel_error))
-plt.ylim(bottom=0)
-
-plt.title("Relative error of Sleekit compared to standard quantization")
-plt.xlabel("Layers")
-plt.ylabel("Relative error")
-
-if args.save_figure is not None:
-    plt.savefig(args.save_figure)
-else:
-    plt.show()
