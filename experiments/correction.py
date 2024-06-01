@@ -12,7 +12,7 @@ parser = argparse.ArgumentParser(
 )
 parser.add_argument("dir", type=str, help="Directory containing the weights")
 parser.add_argument(
-    "--codebook-size", type=int, default=16, help="Size of the codebook to use"
+    "--codebook-size", type=int, default=4, help="Size of the codebook to use"
 )
 parser.add_argument("--damp", type=float, default=0.01, help="Hessian dampening")
 parser.add_argument("--save-figure", type=str, help="Save the figure to this file")
