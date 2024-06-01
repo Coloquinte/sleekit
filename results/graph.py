@@ -8,7 +8,11 @@ data = pandas.read_csv("results/correction.csv", sep="\t")
 gptq = [1.0 for d in data["GPTQ"]]
 plus_bias = sorted(data["GPTQ+BiasCorrection"] / data["GPTQ"], reverse=True)
 with_bias = sorted(data["GPTQWithBiasCorrection"] / data["GPTQ"], reverse=True)
-best = sorted(np.minimum(data["GPTQ+BiasCorrection"], data["GPTQWithBiasCorrection"]) / data["GPTQ"], reverse=True)
+best = sorted(
+    np.minimum(data["GPTQ+BiasCorrection"], data["GPTQWithBiasCorrection"])
+    / data["GPTQ"],
+    reverse=True,
+)
 
 
 plt.title("Impact of adding bias correction; less is better")
@@ -29,7 +33,7 @@ plt.plot(with_bias, label="Bias correction during GPTQ")
 plt.plot(best, label="Best")
 plt.legend()
 plt.savefig("results/correction.png")
-#plt.show()
+# plt.show()
 plt.clf()
 
 data = pandas.read_csv("results/scaling.csv", sep="\t")
@@ -56,12 +60,15 @@ plt.plot(hessian, label="Full hessian scaling")
 plt.plot(obq, label="Exhaustive search")
 plt.legend()
 plt.savefig("results/scaling.png")
-#plt.show()
+# plt.show()
 plt.clf()
 
 data = pandas.read_csv("results/compare.csv", sep="\t")
 standard = [1.0 for d in data["Standard"]]
+correction = sorted(data["Correction"] / data["Standard"], reverse=True)
+scaling = sorted(data["Scaling"] / data["Standard"], reverse=True)
 sleekit = sorted(data["Sleekit"] / data["Standard"], reverse=True)
+integrated = sorted(data["Integrated"] / data["Standard"], reverse=True)
 
 plt.title("Relative error with Sleekit; less is better")
 plt.xlabel("Layers")
@@ -77,9 +84,9 @@ plt.gca().set_yticklabels([f"{100 * (t - 1):+.0f}%" for t in yticks])
 
 plt.plot(standard, label="No change")
 plt.plot(sleekit, label="Sleekit")
-plt.plot(diag, label="Only diagonal scaling")
-plt.plot(plus_bias, label="Only bias correction")
+plt.plot(scaling, label="Only diagonal scaling")
+plt.plot(correction, label="Only bias correction")
 plt.legend()
 plt.savefig("results/compare.png")
-#plt.show()
+# plt.show()
 plt.clf()
