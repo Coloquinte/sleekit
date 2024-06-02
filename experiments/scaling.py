@@ -21,6 +21,7 @@ parser.add_argument(
     action="store_true",
     help="Use the hessian with bias correction for scaling and evaluation",
 )
+parser.add_argument("--show-figure", action="store_true", help="Show the graph")
 parser.add_argument("--save-figure", type=str, help="Save the figure to this file")
 gp = parser.add_argument_group("Optimization")
 gp.add_argument(
@@ -155,20 +156,21 @@ for root in it:
     it.write(msg)
     rel_error_best.append(best_error)
 
-plt.plot(np.sort(rel_error_diag), label="Diagonal hessian scaling")
-if args.run_hessian:
-    plt.plot(np.sort(rel_error_hessian), label="Hessian scaling")
-if args.run_obq_aware:
-    plt.plot(np.sort(rel_error_obq), label="OBQ-aware scaling")
-plt.plot(np.sort(rel_error_best), label="Best")
-plt.ylim(bottom=0)
-plt.legend()
+if args.save_figure is not None or args.show_figure:
+    plt.plot(np.sort(rel_error_diag), label="Diagonal hessian scaling")
+    if args.run_hessian:
+        plt.plot(np.sort(rel_error_hessian), label="Hessian scaling")
+    if args.run_obq_aware:
+        plt.plot(np.sort(rel_error_obq), label="OBQ-aware scaling")
+    plt.plot(np.sort(rel_error_best), label="Best")
+    plt.ylim(bottom=0)
+    plt.legend()
 
-plt.title("Relative error using Hessian scaling")
-plt.xlabel("Layers")
-plt.ylabel("Error relative to MSE")
+    plt.title("Relative error using Hessian scaling")
+    plt.xlabel("Layers")
+    plt.ylabel("Error relative to MSE")
 
-if args.save_figure is not None:
-    plt.savefig(args.save_figure)
-else:
-    plt.show()
+    if args.save_figure is not None:
+        plt.savefig(args.save_figure)
+    else:
+        plt.show()
