@@ -5,6 +5,8 @@ This makes its representation smaller, both on disk and in memory, and can make 
 At the same time, it reduces the precision of the computations, so that good algorithm design is necessary to maintain good quality.
 
 This repository contains tools to research post-training neural networks quantization, with methods to improve over the current state-of-the-art.
+It is purely for analysis purpose: complete implementations will be made available on other repositories.
+Our main contributions are two simple improvements that are compatible with most quantization methods: an improved scaling method, and making better use of the bias during quantization.
 
 ## Quantization method
 
@@ -24,7 +26,7 @@ One targets the scaling step, and allows to select better scaling factors. The o
 To develop our methods we analyze the effect of quantization decisions on a per-layer basis.
 Since post-training quantization operates at the layer level, this gives us a much more precise view of quantization behaviour than network-level metrics, and allows for rapid iteration.
 
-Our baseline for comparison is the [GPTQ](https://arxiv.org/abs/2210.17323) algorithm with 2-bit weights.
+Our baseline for comparison is the [GPTQ](https://arxiv.org/abs/2210.17323) algorithm with 3-bit and 1.5-bit weights.
 For the layer weights and metrics, we use layer statistics from a full accuracy run on several smaller networks (OPT-125M, OPT-350M, BLOOM-560M).
 We compare the error introduced by the quantization with and without our methods.
 
@@ -34,7 +36,7 @@ A good scaling factor minimizes the error introduced by quantization.
 The typical method is to chose a scaling factor that minimizes the mean squared error on the weights (MSE).
 We introduce a more precise approach, that optimizes the layer's result directly.
 
-For weight optimization, we already have access to an accurate measure of the layer's error (the hessian matrix).
+For weight optimization, we already have access to an accurate measure of the layer's error (the hessian matrix $H$ obtained from input samples).
 Our idea is to reuse it for scaling optimization.
 We test three different approaches to scaling, and compare the layer error after applying GPTQ:
 * minimizing the mean squared error after rounding to the nearest;
@@ -42,7 +44,7 @@ We test three different approaches to scaling, and compare the layer error after
 * using the diagonal of the hessian matrix to compute the error, which has the same computational cost as the MSE;
 * using the full weight optimization to compute the error for each scaling value, which is extremely expensive but is theoretically optimal.
 
-![Graph of scaling behaviour](results/scaling.png)
+<img src="results/scaling_1.5b.png" width=45%><img src="results/scaling_3b.png" width=45%>
 
 The usual approach of minimizing the MSE yields results that are far from optimal.
 Using the full hessian matrix or its diagonal yields similar results that are on average much better than MSE alone.
@@ -50,20 +52,22 @@ However, they are still far from the theoretical optimum of integrating the weig
 
 ### Trick 2: adding bias correction
 
-Bias correction is [a method](https://arxiv.org/abs/1810.05723) used to reduce the impact of quantization on a layer.
+[Bias correction](https://arxiv.org/abs/1810.05723) is a method used to reduce the impact of quantization on a layer.
 Newer quantization methods behave much better, and it is not used much anymore.
-We show that bias correction still brings large gains on some layers, and develop a method to integrate it with weight optimization.
+However, it is compatible and there is no reason not to use both.
+The effect of bias correction can even be integrated in the cost function used for weight optimization, using $H=\frac{1}{n} X^\intercal X -M^\intercal M$, where $X$ are the input samples and $M = \frac{1}{n}1^\intercal X$ is the average value of the samples for each input.
 
 We test three different ways to update the bias:
 * applying weight optimization alone (GPTQ) without bias correction;
 * applying bias correction after weight optimization, yielding a slightly smaller layer error;
 * taking the effect of bias correction into account during weight optimization.
 
-![Graph of bias correction behaviour](results/correction.png)
+<img src="results/correction_1.5b.png" width=45%><img src="results/correction_3b.png" width=45%>
 
-Bias correction greatly improves certain layers, in particular some attention layers in all networks.
+Adding back bias correction greatly improves certain layers, in particular some attention layers in all networks.
 While it is always an improvement in theory, bias correction can play havoc with the optimization algorithm, and taking it into account during weight optimization is sometimes detrimental.
 Adding bias correction after optimization, or picking the best of the two results, is always better than the baseline.
+Unsurprisingly, it has more impact with a more agressive quantization.
 
 ### The many tricks that do not work
 
@@ -78,8 +82,9 @@ The following approaches did not yield promising results and were abandoned:
 Finally, we put the two algorithms together in Sleekit.
 Scaling is performed based on the diagonal of the hessian matrix *with* bias correction effect included.
 Weight optimization is performed without taking bias correction into account to avoid pathological behaviour, but is followed by bias correction.
+The computational cost of the algorithm is not increased, and the quality of the results could still be improved, for example by running several of the above methods and picking the best.
 
-![Graph of Sleekit behaviour](results/compare.png)
+<img src="results/compare_1.5b.png" width=45%><img src="results/compare_3b.png" width=45%>
 
 Putting the two together yields results that are much better than expected from simply stacking the two improvements.
 Taking into account the effect of bias correction during scaling seems to be the reason for this surprisingly good result.
