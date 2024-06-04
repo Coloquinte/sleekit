@@ -36,9 +36,9 @@ def test_obq():
     H = random_psd_matrix(size, 2, damp)
     W = 10.0 * np.random.randn(10, size)
     quantizer = lambda x: np.round(x)
-    Q_ordered = quantize_opt(W, H, quantizer, act_order=True, min_block_size=size)
-    Q_unordered = quantize_opt(W, H, quantizer, act_order=False, min_block_size=size)
-    Q_cholesky = quantize_opt(W, H, quantizer, act_order=2, min_block_size=size)
+    Q_ordered = quantize_opt(W, H, quantizer, act_order="diag", min_block_size=size)
+    Q_unordered = quantize_opt(W, H, quantizer, act_order="none", min_block_size=size)
+    Q_cholesky = quantize_opt(W, H, quantizer, act_order="pivot", min_block_size=size)
     assert Q_unordered.shape == W.shape
     assert Q_ordered.shape == W.shape
     assert Q_cholesky.shape == W.shape
@@ -58,11 +58,11 @@ def test_blockobq():
     H = random_psd_matrix(size, 2, damp)
     W = 10.0 * np.random.randn(1, size)
     quantizer = lambda x: np.round(x)
-    Q = quantize_opt(W, H, quantizer, min_block_size=1, act_order=False)
+    Q = quantize_opt(W, H, quantizer, min_block_size=1, act_order="none")
     for b in [3, 4, 7, 8, 63, 64]:
         for n in [2, 4]:
             Q_block = quantize_opt(
-                W, H, quantizer, min_block_size=b, num_blocks=n, act_order=False
+                W, H, quantizer, min_block_size=b, num_blocks=n, act_order="none"
             )
             # We may be unlucky for close to values close to a half-integer, but should be fine
             assert np.allclose(Q, Q_block)

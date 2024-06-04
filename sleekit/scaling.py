@@ -50,7 +50,7 @@ def compute_non_saturating_scaling(data, codebook, axis=0):
     return scale
 
 
-def quantize_with_scaling(data, scale, quantizer, H=None, act_order=1):
+def quantize_with_scaling(data, scale, quantizer, H=None, act_order="diag"):
     """
     Quantize the weights after applying a scaling factor.
 

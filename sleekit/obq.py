@@ -157,7 +157,7 @@ def _cholesky_ordering(H):
     return order
 
 
-def quantize_opt(W, H, quantizer, act_order=1, min_block_size=32, num_blocks=8):
+def quantize_opt(W, H, quantizer, act_order="diag", min_block_size=32, num_blocks=8):
     """
     Quantize the weights with the given quantizer, minimizing the squared error using a GPTQ-like algorithm.
 
@@ -176,14 +176,26 @@ def quantize_opt(W, H, quantizer, act_order=1, min_block_size=32, num_blocks=8):
     H = H.astype(np.float32)
 
     # Reorder if required, by order of decreasing diagonal elements
-    if act_order == 3:
+    if act_order == "err":
+        Q = quantizer(W)
+        err = np.abs(Q - W).sum(axis=0)
+        order = np.argsort(-np.diag(H) * err)
+    elif act_order == "sqerr":
+        Q = quantizer(W)
+        sqerr = np.square(Q - W).sum(axis=0)
+        order = np.argsort(-np.diag(H) * sqerr)
+    elif act_order == "combined_diag":
+        order = np.argsort(-np.diag(H) / np.diag(np.linalg.inv(H)))
+    elif act_order == "inv_diag":
         order = np.argsort(np.diag(np.linalg.inv(H)))
-    elif act_order == 2:
+    elif act_order == "pivot":
         order = _cholesky_ordering(H)
-    elif act_order is True or act_order == 1:
+    elif act_order == "diag":
         order = np.argsort(-np.diag(H))
-    else:
+    elif act_order == "none":
         order = np.arange(W.shape[1])
+    else:
+        raise RuntimeError(f"Invalid act_order value {act_order}")
 
     Q = _quantize_opt_ordered(W, H, quantizer, order, min_block_size, num_blocks)
 
