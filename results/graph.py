@@ -23,9 +23,10 @@ for b in [1, 1.5, 2, 3]:
     plt.xlabel("Layers")
     plt.ylabel("Error relative to diagonal ordering (%)")
     plt.yscale("log")
-    plt.ylim(bottom=0.25, top=2.0)
+    plt.xlim(left=0, right=len(data) - 1)
+    plt.ylim(bottom=0.5, top=1.5)
 
-    yticks = [0.3, 0.4, 0.5, 0.6, 0.8, 1.0, 1.2, 1.5, 2.0]
+    yticks = [0.5, 0.6, 0.8, 1.0, 1.2, 1.5, 2.0]
     plt.gca().set_yticks([])
     plt.gca().set_yticks([], minor=True)
     plt.gca().set_yticks(yticks)
@@ -57,6 +58,7 @@ for b in [1, 1.5, 2, 3]:
     plt.xlabel("Layers")
     plt.ylabel("Error relative to GPTQ alone (%)")
     plt.yscale("log")
+    plt.xlim(left=0, right=len(data) - 1)
     plt.ylim(bottom=0.25, top=2.0)
 
     yticks = [0.3, 0.4, 0.5, 0.6, 0.8, 1.0, 1.2, 1.5, 2.0]
@@ -95,9 +97,10 @@ for b in [1, 1.5, 2, 3]:
     plt.xlabel("Layers")
     plt.ylabel("Relative error (%)")
     plt.yscale("log")
-    plt.ylim(bottom=0.25, top=2.0)
+    plt.xlim(left=0, right=len(data) - 1)
+    plt.ylim(bottom=0.125, top=2.0)
 
-    yticks = [0.3, 0.4, 0.5, 0.6, 0.8, 1.0, 1.2, 1.5, 2.0]
+    yticks = [0.2, 0.3, 0.4, 0.5, 0.6, 0.8, 1.0, 1.2, 1.5, 2.0]
     plt.gca().set_yticks([])
     plt.gca().set_yticks([], minor=True)
     plt.gca().set_yticks(yticks)
@@ -132,9 +135,10 @@ for b in [1, 1.5, 2, 3]:
     plt.xlabel("Layers")
     plt.ylabel("Error relative to MSE scaling (%)")
     plt.yscale("log")
-    plt.ylim(bottom=0.25, top=2.0)
+    plt.xlim(left=0, right=len(data) - 1)
+    plt.ylim(bottom=0.125, top=2.0)
 
-    yticks = [0.3, 0.4, 0.5, 0.6, 0.8, 1.0, 1.2, 1.5, 2.0]
+    yticks = [0.2, 0.3, 0.4, 0.5, 0.6, 0.8, 1.0, 1.2, 1.5, 2.0]
     plt.gca().set_yticks([])
     plt.gca().set_yticks([], minor=True)
     plt.gca().set_yticks(yticks)
