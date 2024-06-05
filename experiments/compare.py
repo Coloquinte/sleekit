@@ -46,7 +46,7 @@ roots = sorted(
 
 rel_error = []
 
-msg = "Data\tStandard\tCorrection\tScaling\tSleekit\tIntegrated"
+msg = "Data\tStandard\tCorrection\tScaling\tScalingBiasOrder\tScalingOrder\tScalingBias"
 
 print(msg)
 
@@ -66,9 +66,18 @@ for root in it:
         min_factor=args.min_factor,
         max_factor=args.max_factor,
     )
-    standard_weight = quantize_with_scaling(weight, sc, cb, H=standard_hessian)
+    # Standard GPTQ
+    standard_weight = quantize_with_scaling(
+        weight, sc, cb, H=standard_hessian, act_order="diag"
+    )
     standard_error = quantization_error(weight, standard_weight, H=standard_hessian)
-    correction_error = quantization_error(weight, standard_weight, H=corrected_hessian)
+    # Integrated bias correction only
+    correction_weight = quantize_with_scaling(
+        weight, sc, cb, H=corrected_hessian, act_order="diag"
+    )
+    correction_error = quantization_error(
+        weight, correction_weight, H=corrected_hessian
+    )
 
     sc = compute_min_mse_scaling(
         weight,
@@ -78,6 +87,7 @@ for root in it:
         min_factor=args.min_factor,
         max_factor=args.max_factor,
     )
+    # Scaling only
     scaling_weight = quantize_with_scaling(weight, sc, cb, H=standard_hessian)
     scaling_error = quantization_error(weight, scaling_weight, H=standard_hessian)
 
@@ -89,12 +99,27 @@ for root in it:
         min_factor=args.min_factor,
         max_factor=args.max_factor,
     )
-    sleekit_weight = quantize_with_scaling(weight, sc, cb, H=standard_hessian)
-    sleekit_error = quantization_error(weight, sleekit_weight, H=corrected_hessian)
-    integrated_weight = quantize_with_scaling(weight, sc, cb, H=corrected_hessian)
-    integrated_error = quantization_error(
-        weight, integrated_weight, H=corrected_hessian
+    # Scaling + integrated bias correction + improved ordering
+    scaling_bias_order_weight = quantize_with_scaling(
+        weight, sc, cb, H=corrected_hessian, act_order="sqerr"
     )
-    msg = f"{name}\t{standard_error}\t{correction_error}\t{scaling_error}\t{sleekit_error}\t{integrated_error}"
+    scaling_bias_order_error = quantization_error(
+        weight, scaling_bias_order_weight, H=corrected_hessian
+    )
+    # Scaling + basic bias correction + improved ordering
+    scaling_order_weight = quantize_with_scaling(
+        weight, sc, cb, H=standard_hessian, act_order="sqerr"
+    )
+    scaling_order_error = quantization_error(
+        weight, scaling_order_weight, H=corrected_hessian
+    )
+    # Scaling + integrated bias correction + basic ordering
+    scaling_bias_weight = quantize_with_scaling(
+        weight, sc, cb, H=corrected_hessian, act_order="diag"
+    )
+    scaling_bias_error = quantization_error(
+        weight, scaling_bias_weight, H=corrected_hessian
+    )
+    msg = f"{name}\t{standard_error}\t{correction_error}\t{scaling_error}\t{scaling_bias_order_error}\t{scaling_order_error}\t{scaling_bias_error}"
 
     it.write(msg)

@@ -69,25 +69,29 @@ While it is always an improvement in theory, bias correction can play havoc with
 Adding bias correction after optimization, or picking the best of the two results, is always better than the baseline.
 Unsurprisingly, it has more impact with a more agressive quantization.
 
+### Minor tricks
+
+We obtain a small improvement by modifying the ordering used for the GPTQ algorithm in weight optimization. GPTQ uses the weights on the diagonal of the matrix, but multiplying them by the sum of squares of the quantization error (without correction) yields a small but significant improvement.
+
 ### The many tricks that do not work
 
 The following approaches did not yield promising results and were abandoned:
 * Improved codebooks: the data is far from being gaussian-distributed, but training a codebook naively is not better than a NF4 codebook. A good codebook training would take the importance of individual weights in the layer into account.
 * Entropy coding: it is tempting to combine codebook optimization with entropy coding to reduce storage needs. However, the gain in entropy is not huge compared to an error-optimized codebook, and does not seem worth the effort.
-* GPTQ reordering: other heuristic orderings for GPTQ do not bring a consistent reduction in layer error compared to using the diagonal of the hessian matrix as the original paper does.
+* GPTQ reordering: clever heuristic orderings for GPTQ based on the hessian matrix do not bring a reduction in layer error, compared to using its diagonal as the original paper does. We tested several variations using the diagonal of the inverse and pivoted Cholesky decompositions.
 * More complex algorithms for weight optimization: it just doesn't scale, but if you want to go in this direction you probably want to use the [MQLib](https://github.com/MQLib/MQLib) as a solver.
 
 ### Putting it all together
 
-Finally, we put the two algorithms together in Sleekit.
-Scaling is performed based on the diagonal of the hessian matrix *with* bias correction effect included.
-Weight optimization is performed without taking bias correction into account to avoid pathological behaviour, but is followed by bias correction.
-The computational cost of the algorithm is not increased, and the quality of the results could still be improved, for example by running several of the above methods and picking the best.
+Finally, we put all these algorithms together in Sleekit.
+The hessian matrix is modified to represent the effect of bias correction.
+Scaling is performed based on its diagonal, and weight correction uses our slightly improved ordering.
+The computational cost of the algorithm is not increased, and there are many ways to improve the quality of the results for a penalty in quantization time.
+For example we could run several of the above methods and pick the best.
 
 <img src="results/compare_1.5b.png" width=45%><img src="results/compare_3b.png" width=45%>
 
-Putting the two together yields results that are much better than expected from simply stacking the two improvements.
-Taking into account the effect of bias correction during scaling seems to be the reason for this surprisingly good result.
+The various tricks interact well, and their benefits seem to stack.
 
 ## References
 

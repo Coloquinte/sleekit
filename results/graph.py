@@ -68,8 +68,8 @@ for b in [1, 1.5, 2, 3]:
     plt.gca().set_yticklabels([f"{100 * (t - 1):+.0f}%" for t in yticks])
 
     plt.plot(gptq, label="GPTQ alone", color="blue")
-    plt.plot(plus_bias, label="Bias correction after GPTQ", color="orange")
-    plt.plot(with_bias, label="Bias correction during GPTQ", color="purple")
+    plt.plot(plus_bias, label="Bias correction after GPTQ", color="purple")
+    plt.plot(with_bias, label="Bias correction during GPTQ", color="orange")
     plt.legend()
     plt.savefig(f"results/correction_{b}b.png")
     # plt.show()
@@ -83,14 +83,12 @@ for b in [1, 1.5, 2, 3]:
     standard = [1.0 for d in data["Standard"]]
     correction = sorted(data["Correction"] / data["Standard"], reverse=True)
     scaling = sorted(data["Scaling"] / data["Standard"], reverse=True)
-    sleekit = sorted(data["Sleekit"] / data["Standard"], reverse=True)
-    integrated = sorted(data["Integrated"] / data["Standard"], reverse=True)
+    sleekit = sorted(data["ScalingBiasOrder"] / data["Standard"], reverse=True)
     geomean_correction = 100 * np.exp(np.mean(np.log(correction))) - 100
     geomean_scaling = 100 * np.exp(np.mean(np.log(scaling))) - 100
     geomean_sleekit = 100 * np.exp(np.mean(np.log(sleekit))) - 100
-    geomean_integrated = 100 * np.exp(np.mean(np.log(integrated))) - 100
     print(
-        f"Compare {b}b: correction {geomean_correction:+.2f}%, scaling {geomean_scaling:+.2f}%, sleekit {geomean_sleekit:+.2f}%, integrated {geomean_integrated:+.2f}%"
+        f"Compare {b}b: correction {geomean_correction:+.2f}%, scaling {geomean_scaling:+.2f}%, sleekit {geomean_sleekit:+.2f}%"
     )
 
     plt.title(f"Relative error with Sleekit ({b}-bit); lower is better")
