@@ -130,3 +130,40 @@ def compute_min_mse_scaling(
         best_error[better] = error[better]
         best_choice[better] = s
     return initial_scale * best_choice
+
+
+def compute_scaling(
+    data,
+    codebook,
+    H,
+    mode="mse",
+    axis=0,
+    min_factor=0.05,
+    max_factor=1.0,
+    grid_size=100,
+):
+    if mode == "max":
+        return compute_non_saturating_scaling(data, codebook, axis)
+    if mode == "norm":
+        return compute_norm_scaling(data, axis)
+    obq = False
+    if mode == "mse":
+        H = None
+    elif mode == "hessian":
+        pass
+    elif mode == "diag":
+        H = np.diag(H)
+    elif mode == "obq":
+        obq = True
+    else:
+        raise RuntimeError(f"Unknown scaling mode {mode}")
+    return compute_min_mse_scaling(
+        data,
+        codebook,
+        axis,
+        H=H,
+        obq=obq,
+        grid_size=grid_size,
+        min_factor=min_factor,
+        max_factor=max_factor,
+    )

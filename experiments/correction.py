@@ -66,46 +66,15 @@ for root in it:
     remove_dead_values(hessian, weight, pcdamp=args.damp)
     corrected_hessian = remove_input_bias(hessian, mean)
 
-    if args.scaling == "mse":
-        sc = compute_min_mse_scaling(
-            weight,
-            cb,
-            grid_size=args.grid_size,
-            min_factor=args.min_factor,
-            max_factor=args.max_factor,
-        )
-    elif args.scaling == "max":
-        sc = compute_non_saturating_scaling(weight, cb)
-    elif args.scaling == "hessian":
-        sc = compute_min_mse_scaling(
-            weight,
-            cb,
-            H=hessian,
-            grid_size=args.grid_size,
-            min_factor=args.min_factor,
-            max_factor=args.max_factor,
-        )
-    elif args.scaling == "diag":
-        sc = compute_min_mse_scaling(
-            weight,
-            cb,
-            H=np.diag(hessian),
-            grid_size=args.grid_size,
-            min_factor=args.min_factor,
-            max=args.max_factor,
-        )
-    elif args.scaling == "obq":
-        sc = compute_min_mse_scaling(
-            weight,
-            cb,
-            H=hessian,
-            obq=True,
-            grid_size=args.grid_size,
-            min_factor=args.min_factor,
-            max_factor=args.max_factor,
-        )
-    else:
-        raise RuntimeError(f"Unknown scaling {args.scaling}")
+    sc = compute_scaling(
+        weight,
+        cb,
+        H=hessian,
+        mode=args.scaling,
+        grid_size=args.grid_size,
+        min_factor=args.min_factor,
+        max_factor=args.max_factor,
+    )
 
     gptq_weight = quantize_with_scaling(weight, sc, cb, H=hessian)
     gptq_with_bias_weight = quantize_with_scaling(weight, sc, cb, H=corrected_hessian)
