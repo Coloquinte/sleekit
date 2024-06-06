@@ -15,6 +15,31 @@ def test_quant():
     assert len(cb) == 3
 
 
+def test_quant_up():
+    values = [-1.0, 0.0, 1.0]
+    cb = Codebook(values)
+    assert list(cb.quantize_up([-10.0, -1.0, -0.6, -0.4, 0.4, 0.6, 1.0, 10.0])) == [
+        0,
+        0,
+        0,
+        1,
+        1,
+        float("inf"),
+        float("inf"),
+        float("inf"),
+    ]
+    assert list(cb.quantize_down([-10.0, -1.0, -0.6, -0.4, 0.4, 0.6, 1.0, 10.0])) == [
+        -float("inf"),
+        -float("inf"),
+        -float("inf"),
+        -1,
+        -1,
+        0,
+        0,
+        0,
+    ]
+
+
 def test_dim_quant():
     cb = Codebook([-1, 0, 1])
     data = np.array([[-2, 1, 0], [0.8, 0.1, -1]])
