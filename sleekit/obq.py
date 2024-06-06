@@ -60,13 +60,33 @@ def compute_hessian_chol(H):
     return np.ascontiguousarray(H)
 
 
-def quantization_error(W, Q, H):
+def channelwise_error(W, Q, H):
     """
-    Compute the error between two weight matrices given the hessian
+    Compute the channel error between two weight matrices given the hessian
     """
     E = W - Q
     # Einsum is much too slow: np.einsum("ij,...i,...j", H, E, E).mean()
-    return ((E @ H) * E).sum(axis=-1).mean()
+    return ((E @ H) * E).sum(axis=-1)
+
+
+def quantization_error(W, Q, H):
+    """
+    Compute the mean channel error between two weight matrices given the hessian
+    """
+    # Einsum is much too slow: np.einsum("ij,...i,...j", H, E, E).mean()
+    return channelwise_error(W, Q, H).mean()
+
+
+def compute_gain(W, Q, H, candidates):
+    """
+    Compute the gain of changing the quantized weights to the candidates.
+
+    This gain is (Q - W) @ H @ (Q - W) - (Q + D - W) @ H @ (Q + D - W).
+    Simplifying it yields - 2 * (Q - W) @ H @ D - D @ H @ D, that we simplify nicely.
+    """
+    delta = Q - W
+    D = candidates - Q
+    return -np.square(D) * np.diag(H) - 2 * (delta @ H) * D
 
 
 def _quantize_opt_core(W, Hinv, quantizer):

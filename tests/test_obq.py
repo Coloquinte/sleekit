@@ -6,6 +6,8 @@ from sleekit.obq import (
     quantize_opt,
     quantization_error,
     remove_input_bias,
+    compute_gain,
+    channelwise_error,
 )
 
 
@@ -105,3 +107,34 @@ def test_input_bias_removal():
     # Library implementation is for averaged samples
     library_H = remove_input_bias(H, input_bias)
     assert np.allclose(removed_H, library_H)
+
+
+def compute_gain_exhaustive(W, Q, H, candidates):
+    """
+    Compute the gain of changing the quantized weights to the candidates
+    """
+    assert W.ndim == 2
+    assert H.ndim == 2
+    assert Q.shape == W.shape
+    assert candidates.shape == W.shape
+    assert H.shape[0] == H.shape[1]
+    assert H.shape[0] == W.shape[1]
+    gains = np.zeros_like(Q)
+    err = channelwise_error(W, Q, H)
+    for i in range(W.shape[1]):
+        cur = Q.copy()
+        cur[:, i] = candidates[:, i]
+        gains[:, i] = err - channelwise_error(W, cur, H)
+    return gains
+
+
+def test_gain_computation():
+    sz = 16
+    channels = 10
+    W = np.random.randn(channels, sz)
+    H = random_psd_matrix(sz, 10)
+    Q = np.round(W)
+    Q_next = Q + np.square(np.random.randn(channels, sz))
+    gain_1 = compute_gain_exhaustive(W, Q, H, Q_next)
+    gain_2 = compute_gain(W, Q, H, Q_next)
+    assert np.allclose(gain_1, gain_2)
