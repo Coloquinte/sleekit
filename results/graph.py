@@ -4,11 +4,12 @@ from matplotlib.ticker import PercentFormatter
 import pandas
 import numpy as np
 
-for b in [1, 1.5, 2, 3]:
+
+def export_ordering_graph(b):
     try:
         data = pandas.read_csv(f"results/ordering_{b}b.csv", sep="\t")
     except FileNotFoundError:
-        continue
+        return
     diag = [1.0 for d in data["Diag"]]
     diag_err = sorted(data["DiagErr"] / data["Diag"], reverse=True)
     diag_sqerr = sorted(data["DiagSqErr"] / data["Diag"], reverse=True)
@@ -40,11 +41,12 @@ for b in [1, 1.5, 2, 3]:
     # plt.show()
     plt.clf()
 
-for b in [1, 1.5, 2, 3]:
+
+def export_correction_graph(b):
     try:
         data = pandas.read_csv(f"results/correction_{b}b.csv", sep="\t")
     except FileNotFoundError:
-        continue
+        return
     gptq = [1.0 for d in data["GPTQ"]]
     plus_bias = sorted(data["GPTQ+BiasCorrection"] / data["GPTQ"], reverse=True)
     with_bias = sorted(data["GPTQWithBiasCorrection"] / data["GPTQ"], reverse=True)
@@ -75,11 +77,12 @@ for b in [1, 1.5, 2, 3]:
     # plt.show()
     plt.clf()
 
-for b in [1, 1.5, 2, 3]:
+
+def export_compare_graph(b):
     try:
         data = pandas.read_csv(f"results/compare_{b}b.csv", sep="\t")
     except FileNotFoundError:
-        continue
+        return
     standard = [1.0 for d in data["Standard"]]
     correction = sorted(data["Correction"] / data["Standard"], reverse=True)
     scaling = sorted(data["Scaling"] / data["Standard"], reverse=True)
@@ -113,11 +116,12 @@ for b in [1, 1.5, 2, 3]:
     # plt.show()
     plt.clf()
 
-for b in [1, 1.5, 2, 3]:
+
+def export_scaling_graph(b):
     try:
         data = pandas.read_csv(f"results/scaling_{b}b.csv", sep="\t")
     except FileNotFoundError:
-        continue
+        return
     mse = [1.0 for d in data["MSE"]]
     diag = sorted(data["Diag"] / data["MSE"], reverse=True)
     hessian = sorted(data["Hessian"] / data["MSE"], reverse=True)
@@ -150,3 +154,50 @@ for b in [1, 1.5, 2, 3]:
     plt.savefig(f"results/scaling_{b}b.png")
     # plt.show()
     plt.clf()
+
+
+def export_bits_graph():
+    try:
+        data = pandas.read_csv(f"results/bits.csv", sep="\t")
+    except FileNotFoundError:
+        return
+    d3 = [1.0 for d in data["3-bit"]]
+    d2 = sorted(data["2-bit"] / data["3-bit"], reverse=True)
+    d1_5 = sorted(data["1.5-bit"] / data["3-bit"], reverse=True)
+    d1 = sorted(data["1-bit"] / data["3-bit"], reverse=True)
+    geomean_d2 = np.exp(np.mean(np.log(d2)))
+    geomean_d1_5 = np.exp(np.mean(np.log(d1_5)))
+    geomean_d1 = np.exp(np.mean(np.log(d1)))
+    print(f"Bits: 2b x{geomean_d2:.2f}, 1.5b x{geomean_d1_5:.2f}, 1b x{geomean_d1:.2f}")
+
+    plt.title(f"Impact of the number of bits; lower is better")
+    plt.xlabel("Layers")
+    plt.ylabel("Error relative to 3-bit scaling (%)")
+    plt.yscale("log")
+    plt.xlim(left=0, right=len(data) - 1)
+    plt.ylim(bottom=1, top=20)
+
+    yticks = [1, 1.5, 2, 3, 5, 7, 10, 15, 20]
+    plt.gca().set_yticks([])
+    plt.gca().set_yticks([], minor=True)
+    plt.gca().set_yticks(yticks)
+    plt.gca().set_yticklabels([f"x{t}" for t in yticks])
+
+    plt.plot(d2, label="2-bit")
+    plt.plot(d1_5, label="1.5-bit")
+    plt.plot(d1, label="1-bit")
+    plt.legend()
+    plt.savefig(f"results/bits.png")
+    # plt.show()
+    plt.clf()
+
+
+for b in [1, 1.5, 2, 3]:
+    export_ordering_graph(b)
+for b in [1, 1.5, 2, 3]:
+    export_correction_graph(b)
+for b in [1, 1.5, 2, 3]:
+    export_compare_graph(b)
+for b in [1, 1.5, 2, 3]:
+    export_scaling_graph(b)
+export_bits_graph()
