@@ -226,39 +226,66 @@ def quantize_opt(
     return Q
 
 
-def quantize_local_search(W, Q, H, quantizer, nb_moves):
-    """
-    Perform a local search to improve the quantization error.
-    """
-    assert W.ndim == 2
-    assert H.ndim == 2
-    assert H.shape[0] == H.shape[1]
-    assert H.shape[0] == W.shape[1]
-    assert Q.shape == W.shape
-    if nb_moves == 0:
-        return Q
-    Q = Q.copy()
-    # Compute the gain of switching the quantization up or down
-    err = channelwise_error(W, Q, H)
-    for i in range(nb_moves):
-        Q_up = quantizer.quantize_up(Q)
-        Q_down = quantizer.quantize_down(Q)
-        gain_up = compute_gain(W, Q, H, Q_up)
-        gain_down = compute_gain(W, Q, H, Q_down)
-        # Compute the change in gain
-        change_up = gain_up.max(axis=1)
-        change_down = gain_down.max(axis=1)
+class LocalSearchQuantizer:
+    def __init__(self, W, Q, H, quantizer):
+        assert W.ndim == 2
+        assert H.ndim == 2
+        assert H.shape[0] == H.shape[1]
+        assert H.shape[0] == W.shape[1]
+        assert Q.shape == W.shape
+        self.W = W
+        self.Q = Q.copy()
+        self.H = H
+        self.quantizer = quantizer
+        self.recompute_error()
+        self.recompute_candidates()
+        self.recompute_gains()
+
+    @property
+    def nchannels(self):
+        return self.W.shape[0]
+
+    def recompute_error(self):
+        self.err = channelwise_error(self.W, self.Q, self.H)
+
+    def recompute_candidates(self):
+        self.Q_up = self.quantizer.quantize_up(self.Q)
+        self.Q_down = self.quantizer.quantize_down(self.Q)
+
+    def recompute_gains(self):
+        self.gain_up = compute_gain(self.W, self.Q, self.H, self.Q_up)
+        self.gain_down = compute_gain(self.W, self.Q, self.H, self.Q_down)
+
+    def do_move(self):
+        change_up = self.gain_up.max(axis=1)
+        change_down = self.gain_down.max(axis=1)
         change = np.maximum(change_up, change_down)
         change = np.maximum(change, 0)
         is_up = (change_up > change_down) & (change_up > 0)
         is_down = ~is_up & (change_down > 0)
 
         # Pick the new values
-        inds_up = np.arange(W.shape[0])[is_up]
-        best_up = gain_up.argmax(axis=1)[is_up]
-        inds_down = np.arange(W.shape[0])[is_down]
-        best_down = gain_down.argmax(axis=1)[is_down]
-        Q[inds_up, best_up] = Q_up[inds_up, best_up]
-        Q[inds_down, best_down] = Q_down[inds_down, best_down]
-        err -= change
-    return Q
+        inds_up = np.arange(self.nchannels)[is_up]
+        best_up = self.gain_up.argmax(axis=1)[is_up]
+        inds_down = np.arange(self.nchannels)[is_down]
+        best_down = self.gain_down.argmax(axis=1)[is_down]
+        self.Q[inds_up, best_up] = self.Q_up[inds_up, best_up]
+        self.Q[inds_down, best_down] = self.Q_down[inds_down, best_down]
+        self.err -= change
+
+        # Update the candidates and gain
+        # TODO: Should be incremental
+        self.recompute_candidates()
+        self.recompute_gains()
+
+
+def quantize_local_search(W, Q, H, quantizer, nb_moves):
+    """
+    Perform a local search to improve the quantization error.
+    """
+    if nb_moves == 0:
+        return Q
+    ls = LocalSearchQuantizer(W, Q, H, quantizer)
+    for _ in range(nb_moves):
+        ls.do_move()
+    return ls.Q
