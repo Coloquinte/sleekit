@@ -77,20 +77,6 @@ def quantization_error(W, Q, H):
     return channelwise_error(W, Q, H).mean()
 
 
-def compute_gain(W, Q, H, candidates):
-    """
-    Compute the gain of changing the quantized weights to the candidates.
-
-    With D the change between Q and the candidate (with a single non-zero), this gain is
-    (Q - W) @ H @ (Q - W) - (Q + D - W) @ H @ (Q + D - W).
-    Simplifying it yields - 2 * (Q - W) @ H @ D - D @ H @ D, which we can compute for all
-    candidates in a single matrix operation.
-    """
-    delta = Q - W
-    D = candidates - Q
-    return -np.square(D) * np.diag(H) - 2 * (delta @ H) * D
-
-
 def _quantize_opt_core(W, Hinv, quantizer):
     """
     Core of the quantization algorithm, without block operations.
@@ -226,39 +212,142 @@ def quantize_opt(
     return Q
 
 
+def compute_gain(W, Q, H, candidates):
+    """
+    Compute the gain of changing the quantized weights to the candidates.
+
+    With D = C - Q the change between Q and the candidate (with a single non-zero), this gain is
+    (Q - W) @ H @ (Q - W) - (Q + D - W) @ H @ (Q + D - W).
+    Simplifying it yields - 2 * (Q - W) @ H @ D - D @ H @ D, which we can compute for all
+    candidates in a single matrix operation.
+    """
+    delta = Q - W
+    D = candidates - Q
+    return -np.square(D) * np.diag(H) - 2 * (delta @ H) * D
+
+
+class LocalSearchQuantizer:
+    def __init__(self, W, Q, H, quantizer):
+        assert W.ndim == 2
+        assert H.ndim == 2
+        assert H.shape[0] == H.shape[1]
+        assert H.shape[0] == W.shape[1]
+        assert Q.shape == W.shape
+        self.W = W
+        self.Q = Q.copy()
+        self.H = H
+        self.quantizer = quantizer
+        self.recompute_error()
+        self.recompute_candidates()
+        self.recompute_gains()
+
+    @property
+    def nchannels(self):
+        return self.W.shape[0]
+
+    def recompute_error(self):
+        self.err = channelwise_error(self.W, self.Q, self.H)
+
+    def recompute_candidates(self):
+        self.Q_up = self.quantizer.quantize_up(self.Q)
+        self.Q_down = self.quantizer.quantize_down(self.Q)
+
+    def recompute_gains(self):
+        self.gain_up = compute_gain(self.W, self.Q, self.H, self.Q_up)
+        self.gain_down = compute_gain(self.W, self.Q, self.H, self.Q_down)
+
+    def do_change(self, gains, filter, candidates):
+        inds = np.arange(self.nchannels)[filter]
+        change = gains.max(axis=1)[filter]
+        best = gains.argmax(axis=1)[filter]
+        new_vals = candidates[inds, best]
+        # Update the values
+        old_vals = self.Q[inds, best].copy()
+        self.Q[inds, best] = new_vals
+        # Update the candidates
+        old_vals_up = self.Q_up[inds, best].copy()
+        vals_up = self.quantizer.quantize_up(new_vals)
+        self.Q_up[inds, best] = vals_up
+        old_vals_down = self.Q_down[inds, best].copy()
+        vals_down = self.quantizer.quantize_down(new_vals)
+        self.Q_down[inds, best] = vals_down
+        # Update the error
+        self.err[inds] -= change
+        # Update the gains
+        self.update_gains(
+            self.gain_up,
+            inds,
+            best,
+            old_vals,
+            old_vals_up,
+            self.Q_up,
+        )
+        self.update_gains(
+            self.gain_down,
+            inds,
+            best,
+            old_vals,
+            old_vals_down,
+            self.Q_down,
+        )
+
+    def update_gains(self, gains, inds, changed, old_vals, old_cands, candidates):
+        """
+        Update the gains, assuming the change in values and candidates happened already.
+        """
+        rng = np.arange(len(inds))
+        H = self.H
+        W = self.W[inds].copy()
+
+        # Full-matrix expressions
+        Q2_F = self.Q[inds].copy()
+        Q1_F = Q2_F.copy()
+        Q1_F[rng, changed] = old_vals
+        C2_F = candidates[inds].copy()
+        D2_F = C2_F - Q2_F
+        H_rows = H[changed].copy()
+
+        # Sparse expressions, only containing the changed values
+        C1, C2, Q1, Q2 = old_cands, C2_F[rng, changed], old_vals, Q2_F[rng, changed]
+        D1, D2 = C1 - Q1, C2 - Q2
+        H_diag = np.diag(self.H)[changed]
+
+        # Change due to the diagonal term
+        #    D1 @ H @ D1 - D2 @ H @ D2
+        gains[inds, changed] += H_diag * (np.square(D1) - np.square(D2))
+        # Or with full matrix expression
+        #    gains[inds] += (np.square(D1_F) - np.square(D2_F)) * np.diag(H)
+
+        # Change due to the interaction term, part 1
+        #    2 * (Q1 - W) @ H @ (D1 - D2)
+        gains[inds, changed] += 2 * ((Q1_F - W) * H_rows).sum(axis=-1) * (D1 - D2)
+        # Or with full matrix expression
+        #    gains[inds] += 2 * ((Q1_F - W) @ H) * (D1_F - D2_F)
+
+        # Change due to the interaction term, part 2
+        #    2 * (Q1 - Q2) @ H @ D2
+        gains[inds] += 2 * np.expand_dims(Q1 - Q2, 1) * H_rows * D2_F
+        # Or with full matrix expression
+        #    gains[inds] += 2 * ((Q1_F - new_Q) @ H) * D2_F
+
+    def do_move(self):
+        change_up = self.gain_up.max(axis=1)
+        change_down = self.gain_down.max(axis=1)
+        flip_up = (change_up > change_down) & (change_up > 0)
+        flip_down = ~flip_up & (change_down > 0)
+
+        # Pick the new values
+        self.do_change(self.gain_up, flip_up, self.Q_up)
+        self.do_change(self.gain_down, flip_down, self.Q_down)
+
+
 def quantize_local_search(W, Q, H, quantizer, nb_moves):
     """
     Perform a local search to improve the quantization error.
     """
-    assert W.ndim == 2
-    assert H.ndim == 2
-    assert H.shape[0] == H.shape[1]
-    assert H.shape[0] == W.shape[1]
-    assert Q.shape == W.shape
     if nb_moves == 0:
         return Q
-    Q = Q.copy()
-    # Compute the gain of switching the quantization up or down
-    err = channelwise_error(W, Q, H)
-    for i in range(nb_moves):
-        Q_up = quantizer.quantize_up(Q)
-        Q_down = quantizer.quantize_down(Q)
-        gain_up = compute_gain(W, Q, H, Q_up)
-        gain_down = compute_gain(W, Q, H, Q_down)
-        # Compute the change in gain
-        change_up = gain_up.max(axis=1)
-        change_down = gain_down.max(axis=1)
-        change = np.maximum(change_up, change_down)
-        change = np.maximum(change, 0)
-        is_up = (change_up > change_down) & (change_up > 0)
-        is_down = ~is_up & (change_down > 0)
-
-        # Pick the new values
-        inds_up = np.arange(W.shape[0])[is_up]
-        best_up = gain_up.argmax(axis=1)[is_up]
-        inds_down = np.arange(W.shape[0])[is_down]
-        best_down = gain_down.argmax(axis=1)[is_down]
-        Q[inds_up, best_up] = Q_up[inds_up, best_up]
-        Q[inds_down, best_down] = Q_down[inds_down, best_down]
-        err -= change
-    return Q
+    ls = LocalSearchQuantizer(W, Q, H, quantizer)
+    for _ in range(nb_moves):
+        ls.do_move()
+    return ls.Q
