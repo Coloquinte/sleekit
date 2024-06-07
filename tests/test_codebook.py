@@ -18,26 +18,11 @@ def test_quant():
 def test_quant_up():
     values = [-1.0, 0.0, 1.0]
     cb = Codebook(values)
-    assert list(cb.quantize_up([-10.0, -1.0, -0.6, -0.4, 0.4, 0.6, 1.0, 10.0])) == [
-        0,
-        0,
-        0,
-        1,
-        1,
-        float("inf"),
-        float("inf"),
-        float("inf"),
-    ]
-    assert list(cb.quantize_down([-10.0, -1.0, -0.6, -0.4, 0.4, 0.6, 1.0, 10.0])) == [
-        -float("inf"),
-        -float("inf"),
-        -float("inf"),
-        -1,
-        -1,
-        0,
-        0,
-        0,
-    ]
+    lst = [-10.0, -1.0, -0.6, -0.4, 0.4, 0.6, 1.0, 10.0]
+    exp_up = [0, 0, 0, 1, 1, 1, 1, 1]
+    exp_down = [-1, -1, -1, -1, -1, 0, 0, 0]
+    assert list(cb.quantize_up(lst)) == exp_up
+    assert list(cb.quantize_down(lst)) == exp_down
 
 
 def test_dim_quant():

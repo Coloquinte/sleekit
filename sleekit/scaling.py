@@ -50,7 +50,9 @@ def compute_non_saturating_scaling(data, codebook, axis=0):
     return scale
 
 
-def quantize_with_scaling(data, scale, quantizer, H=None, act_order="diag"):
+def quantize_with_scaling(
+    data, scale, quantizer, H=None, act_order="diag", nb_ls_moves=0
+):
     """
     Quantize the weights after applying a scaling factor.
 
@@ -65,8 +67,9 @@ def quantize_with_scaling(data, scale, quantizer, H=None, act_order="diag"):
     assert data.shape[0] == scale.size
     quant = apply_scaling(data, scale, 0)
     if H is not None:
-        # TODO: do the inverse hessian computation only once
-        quant = quantize_opt(quant, H, quantizer, act_order=act_order)
+        quant = quantize_opt(
+            quant, H, quantizer, act_order=act_order, nb_ls_moves=nb_ls_moves
+        )
     else:
         quant = quantizer(quant)
     quant = apply_scaling(quant, 1 / scale, 0)
@@ -122,6 +125,7 @@ def compute_min_mse_scaling(
     best_error = np.full(initial_scale.size, np.inf, dtype=np.float32)
     for s in scales:
         scale = s * initial_scale
+        # TODO: do the inverse hessian computation only once for OBQ
         quant = quantize_with_scaling(
             flat_data, scale, codebook, H if obq and H.ndim == 2 else None
         )
