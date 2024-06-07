@@ -77,20 +77,6 @@ def quantization_error(W, Q, H):
     return channelwise_error(W, Q, H).mean()
 
 
-def compute_gain(W, Q, H, candidates):
-    """
-    Compute the gain of changing the quantized weights to the candidates.
-
-    With D the change between Q and the candidate (with a single non-zero), this gain is
-    (Q - W) @ H @ (Q - W) - (Q + D - W) @ H @ (Q + D - W).
-    Simplifying it yields - 2 * (Q - W) @ H @ D - D @ H @ D, which we can compute for all
-    candidates in a single matrix operation.
-    """
-    delta = Q - W
-    D = candidates - Q
-    return -np.square(D) * np.diag(H) - 2 * (delta @ H) * D
-
-
 def _quantize_opt_core(W, Hinv, quantizer):
     """
     Core of the quantization algorithm, without block operations.
@@ -226,6 +212,20 @@ def quantize_opt(
     return Q
 
 
+def compute_gain(W, Q, H, candidates):
+    """
+    Compute the gain of changing the quantized weights to the candidates.
+
+    With D = C - Q the change between Q and the candidate (with a single non-zero), this gain is
+    (Q - W) @ H @ (Q - W) - (Q + D - W) @ H @ (Q + D - W).
+    Simplifying it yields - 2 * (Q - W) @ H @ D - D @ H @ D, which we can compute for all
+    candidates in a single matrix operation.
+    """
+    delta = Q - W
+    D = candidates - Q
+    return -np.square(D) * np.diag(H) - 2 * (delta @ H) * D
+
+
 class LocalSearchQuantizer:
     def __init__(self, W, Q, H, quantizer):
         assert W.ndim == 2
@@ -256,27 +256,131 @@ class LocalSearchQuantizer:
         self.gain_up = compute_gain(self.W, self.Q, self.H, self.Q_up)
         self.gain_down = compute_gain(self.W, self.Q, self.H, self.Q_down)
 
+    def do_change(self, gains, filter, candidates):
+        inds = np.arange(self.nchannels)[filter]
+        change = gains.max(axis=1)[filter]
+        best = gains.argmax(axis=1)[filter]
+        new_vals = candidates[inds, best]
+        # Update the values
+        old_vals = self.Q[inds, best].copy()
+        self.Q[inds, best] = new_vals
+        # Update the candidates
+        old_vals_up = self.Q_up[inds, best].copy()
+        vals_up = self.quantizer.quantize_up(new_vals)
+        self.Q_up[inds, best] = vals_up
+        old_vals_down = self.Q_down[inds, best].copy()
+        vals_down = self.quantizer.quantize_down(new_vals)
+        self.Q_down[inds, best] = vals_down
+        # Update the error
+        self.err[inds] -= change
+        # Update the gains
+        self.update_gains(
+            self.gain_up, inds, best, old_vals, new_vals, old_vals_up, vals_up, self.Q_up
+        )
+        self.update_gains(
+            self.gain_down, inds, best, old_vals, new_vals, old_vals_down, vals_down, self.Q_down
+        )
+
+    def update_gains(self, gains, inds, best, old_vals, new_vals, old_cands, new_cands, candidates):
+        rng = np.arange(len(inds))
+        H = self.H
+        W = self.W[inds].copy()
+        old_Q = self.Q[inds].copy()
+        old_Q[rng, best] = old_vals
+        new_Q = self.Q[inds].copy()
+        new_Q[rng, best] = new_vals
+        old_candidates = candidates[inds].copy()
+        old_candidates[rng, best] = old_cands
+        new_candidates = candidates[inds].copy()
+        new_candidates[rng, best] = new_cands
+        # old_gains = gains[inds]
+        # gains[inds] = compute_gain(W, new_Q, H, new_candidates)
+
+        # Full-matrix expression
+        old_delta = old_Q - W
+        old_D = old_candidates - old_Q
+        new_delta = new_Q - W
+        new_D = new_candidates - new_Q
+
+
+        # Change due to the diagonal term
+        #    D1 @ H @ D1 - D2 @ H @ D2
+        # gains[inds] += (np.square(old_D) - np.square(new_D)) * np.diag(H)
+
+        # Change due to the interaction term
+        #    2 * (Q1 - W) @ H @ (D1 - D2)
+        # gains[inds] += 2 * ((old_Q - W) @ H) * (old_D - new_D)
+
+        # Change due to the diagonal term
+        #    2 * (Q1 - Q2) @ H @ D2
+        # gains[inds] += 2 * ((old_Q - new_Q) @ H) * new_D
+
+        # Change due to the main term
+        main_full = 2 * (old_delta @ H) * old_D - 2 * (new_delta @ H) * new_D
+        gains[inds] += main_full
+        #main_alternative = 2 * ((old_delta) @ H) * (old_D - new_D) + 2 * ((old_delta - new_delta) @ H) * new_D
+        #main_alternative = 2 * ((old_Q - W) @ H) * (old_D - new_D) + 2 * ((old_Q - new_Q) @ H) * new_D
+
+        # Sparse expressions
+        C1, C2, Q1, Q2 = old_cands, new_cands, old_vals, new_vals
+        D1, D2 = C1 - Q1, C2 - Q2
+        H_diag = self.H[best, best]
+
+        # Change due to the diagonal term
+        #    D1 @ H @ D1 - D2 @ H @ D2
+        gains[inds, best] += H_diag * (np.square(D1) - np.square(D2))
+
+        # Change due to the interaction term
+        #    2 * (Q1 - W) @ H @ (D1 - D2)
+        # TODO
+
+        # Change due to the diagonal term
+        #    2 * (Q1 - Q2) @ H @ D2
+        # gains[inds, best] += 2 * H_diag * (Q1 - Q2) * D2
+
+        return
+        
+        
+        C1, C2, Q1, Q2 = old_cands, new_cands, old_vals, new_vals
+        D1, D2 = C1 - Q1, C2 - Q2
+        # We start from the complete expression of the difference
+        #    - 2 * (Q2 - W) @ H @ D2 - D2 @ H @ D2 + 2 * (Q1 - W) @ H @ D1 + D1 @ H @ D1
+        # that is split into:
+        #    D1 @ H @ D1 - D2 @ H @ D2 + 2 * (Q1 - W) @ H @ D1 - 2 * (Q2 - W) @ H @ D2
+        # and further rewritten as:
+        #    D1 @ H @ D1 - D2 @ H @ D2 + 2 * (Q1 - W) @ H @ (D1 - D2) - 2 * (Q2 - Q1) @ H @ D2
+
+        # Change due to the diagonal term
+        #    D1 @ H @ D1 - D2 @ H @ D2
+        H_diag = self.H[best, best]
+        t1 = H_diag * (np.square(D1) - np.square(D2))
+
+        # Change due to the interaction term
+        #     2 * (Q1 - W) @ H @ (D1 - D2)
+        rng = np.arange(len(inds))
+        Q = self.Q[inds].copy()
+        Q[rng, best] = old_vals
+        W = self.W[inds].copy()
+        t2 = 0  # TODO
+        import pdb
+
+        pdb.set_trace()
+
+        # Change due to the diagonal term
+        t3 = 2 * H_diag * (Q1 - Q2) * D2
+
+        # Combine all of it
+        gains[inds] += t1 + t2 + t3
+
     def do_move(self):
         change_up = self.gain_up.max(axis=1)
         change_down = self.gain_down.max(axis=1)
-        change = np.maximum(change_up, change_down)
-        change = np.maximum(change, 0)
-        is_up = (change_up > change_down) & (change_up > 0)
-        is_down = ~is_up & (change_down > 0)
+        flip_up = (change_up > change_down) & (change_up > 0)
+        flip_down = ~flip_up & (change_down > 0)
 
         # Pick the new values
-        inds_up = np.arange(self.nchannels)[is_up]
-        best_up = self.gain_up.argmax(axis=1)[is_up]
-        inds_down = np.arange(self.nchannels)[is_down]
-        best_down = self.gain_down.argmax(axis=1)[is_down]
-        self.Q[inds_up, best_up] = self.Q_up[inds_up, best_up]
-        self.Q[inds_down, best_down] = self.Q_down[inds_down, best_down]
-        self.err -= change
-
-        # Update the candidates and gain
-        # TODO: Should be incremental
-        self.recompute_candidates()
-        self.recompute_gains()
+        self.do_change(self.gain_up, flip_up, self.Q_up)
+        self.do_change(self.gain_down, flip_down, self.Q_down)
 
 
 def quantize_local_search(W, Q, H, quantizer, nb_moves):
