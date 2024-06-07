@@ -161,14 +161,17 @@ def export_bits_graph():
         data = pandas.read_csv(f"results/bits.csv", sep="\t")
     except FileNotFoundError:
         return
-    d3 = [1.0 for d in data["3-bit"]]
+    d2_8 = sorted(data["2.8-bit"] / data["3-bit"], reverse=True)
+    d2_3 = sorted(data["2.3-bit"] / data["3-bit"], reverse=True)
     d2 = sorted(data["2-bit"] / data["3-bit"], reverse=True)
     d1_5 = sorted(data["1.5-bit"] / data["3-bit"], reverse=True)
     d1 = sorted(data["1-bit"] / data["3-bit"], reverse=True)
+    geomean_d2_8 = np.exp(np.mean(np.log(d2_8)))
+    geomean_d2_3 = np.exp(np.mean(np.log(d2_3)))
     geomean_d2 = np.exp(np.mean(np.log(d2)))
     geomean_d1_5 = np.exp(np.mean(np.log(d1_5)))
     geomean_d1 = np.exp(np.mean(np.log(d1)))
-    print(f"Bits: 2b x{geomean_d2:.2f}, 1.5b x{geomean_d1_5:.2f}, 1b x{geomean_d1:.2f}")
+    print(f"Bits: 2.8b x{geomean_d2_8:.2f}, 2.3b x{geomean_d2_3:.2f}, 2b x{geomean_d2:.2f}, 1.5b x{geomean_d1_5:.2f}, 1b x{geomean_d1:.2f}")
 
     plt.title(f"Impact of the number of bits; lower is better")
     plt.xlabel("Layers")
@@ -183,6 +186,8 @@ def export_bits_graph():
     plt.gca().set_yticks(yticks)
     plt.gca().set_yticklabels([f"x{t}" for t in yticks])
 
+    plt.plot(d2_8, label="2.8-bit")
+    plt.plot(d2_3, label="2.3-bit")
     plt.plot(d2, label="2-bit")
     plt.plot(d1_5, label="1.5-bit")
     plt.plot(d1, label="1-bit")
