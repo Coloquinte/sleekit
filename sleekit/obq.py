@@ -81,8 +81,10 @@ def compute_gain(W, Q, H, candidates):
     """
     Compute the gain of changing the quantized weights to the candidates.
 
-    This gain is (Q - W) @ H @ (Q - W) - (Q + D - W) @ H @ (Q + D - W).
-    Simplifying it yields - 2 * (Q - W) @ H @ D - D @ H @ D, that we simplify nicely.
+    With D the change between Q and the candidate (with a single non-zero), this gain is
+    (Q - W) @ H @ (Q - W) - (Q + D - W) @ H @ (Q + D - W).
+    Simplifying it yields - 2 * (Q - W) @ H @ D - D @ H @ D, which we can compute for all
+    candidates in a single matrix operation.
     """
     delta = Q - W
     D = candidates - Q
@@ -177,7 +179,9 @@ def _cholesky_ordering(H):
     return order
 
 
-def quantize_opt(W, H, quantizer, act_order="diag", min_block_size=32, num_blocks=8):
+def quantize_opt(
+    W, H, quantizer, act_order="diag", min_block_size=32, num_blocks=8, nb_ls_moves=0
+):
     """
     Quantize the weights with the given quantizer, minimizing the squared error using a GPTQ-like algorithm.
 
@@ -218,5 +222,43 @@ def quantize_opt(W, H, quantizer, act_order="diag", min_block_size=32, num_block
         raise RuntimeError(f"Invalid act_order value {act_order}")
 
     Q = _quantize_opt_ordered(W, H, quantizer, order, min_block_size, num_blocks)
+    Q = quantize_local_search(W, Q, H, quantizer, nb_ls_moves)
+    return Q
 
+
+def quantize_local_search(W, Q, H, quantizer, nb_moves):
+    """
+    Perform a local search to improve the quantization error.
+    """
+    assert W.ndim == 2
+    assert H.ndim == 2
+    assert H.shape[0] == H.shape[1]
+    assert H.shape[0] == W.shape[1]
+    assert Q.shape == W.shape
+    if nb_moves == 0:
+        return Q
+    Q = Q.copy()
+    # Compute the gain of switching the quantization up or down
+    err = channelwise_error(W, Q, H)
+    for i in range(nb_moves):
+        Q_up = quantizer.quantize_up(Q)
+        Q_down = quantizer.quantize_down(Q)
+        gain_up = compute_gain(W, Q, H, Q_up)
+        gain_down = compute_gain(W, Q, H, Q_down)
+        # Compute the change in gain
+        change_up = gain_up.max(axis=1)
+        change_down = gain_down.max(axis=1)
+        change = np.maximum(change_up, change_down)
+        change = np.maximum(change, 0)
+        is_up = (change_up > change_down) & (change_up > 0)
+        is_down = ~is_up & (change_down > 0)
+
+        # Pick the new values
+        inds_up = np.arange(W.shape[0])[is_up]
+        best_up = gain_up.argmax(axis=1)[is_up]
+        inds_down = np.arange(W.shape[0])[is_down]
+        best_down = gain_down.argmax(axis=1)[is_down]
+        Q[inds_up, best_up] = Q_up[inds_up, best_up]
+        Q[inds_down, best_down] = Q_down[inds_down, best_down]
+        err -= change
     return Q

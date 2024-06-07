@@ -73,18 +73,18 @@ class Codebook:
 
     def quantize_up(self, data):
         """
-        Quantize data to the value above in the codebook
+        Quantize data to the value above in the codebook, saturating at the highest.
         """
         ind = np.digitize(data, self.thresholds)
-        vals = np.concatenate((np.delete(self.values, 0), [np.inf]))
+        vals = np.concatenate((np.delete(self.values, 0), [self.values[-1]]))
         return vals[ind]
 
     def quantize_down(self, data):
         """
-        Quantize data to the value below in the codebook
+        Quantize data to the value below in the codebook, saturating at the lowest.
         """
         ind = np.digitize(data, self.thresholds)
-        vals = np.concatenate(([-np.inf], np.delete(self.values, -1)))
+        vals = np.concatenate(([self.values[0]], np.delete(self.values, -1)))
         return vals[ind]
 
     def __call__(self, data):
