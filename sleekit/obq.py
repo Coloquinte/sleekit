@@ -309,17 +309,11 @@ class LocalSearchQuantizer:
 
         # Change due to the interaction term
         #    2 * (Q1 - W) @ H @ (D1 - D2)
-        # gains[inds] += 2 * ((old_Q - W) @ H) * (old_D - new_D)
+        gains[inds] += 2 * ((old_Q - W) @ H) * (old_D - new_D)
 
         # Change due to the diagonal term
         #    2 * (Q1 - Q2) @ H @ D2
-        # gains[inds] += 2 * ((old_Q - new_Q) @ H) * new_D
-
-        # Change due to the main term
-        main_full = 2 * (old_delta @ H) * old_D - 2 * (new_delta @ H) * new_D
-        gains[inds] += main_full
-        #main_alternative = 2 * ((old_delta) @ H) * (old_D - new_D) + 2 * ((old_delta - new_delta) @ H) * new_D
-        #main_alternative = 2 * ((old_Q - W) @ H) * (old_D - new_D) + 2 * ((old_Q - new_Q) @ H) * new_D
+        gains[inds] += 2 * ((old_Q - new_Q) @ H) * new_D
 
         # Sparse expressions
         C1, C2, Q1, Q2 = old_cands, new_cands, old_vals, new_vals
@@ -336,41 +330,7 @@ class LocalSearchQuantizer:
 
         # Change due to the diagonal term
         #    2 * (Q1 - Q2) @ H @ D2
-        # gains[inds, best] += 2 * H_diag * (Q1 - Q2) * D2
-
-        return
-        
-        
-        C1, C2, Q1, Q2 = old_cands, new_cands, old_vals, new_vals
-        D1, D2 = C1 - Q1, C2 - Q2
-        # We start from the complete expression of the difference
-        #    - 2 * (Q2 - W) @ H @ D2 - D2 @ H @ D2 + 2 * (Q1 - W) @ H @ D1 + D1 @ H @ D1
-        # that is split into:
-        #    D1 @ H @ D1 - D2 @ H @ D2 + 2 * (Q1 - W) @ H @ D1 - 2 * (Q2 - W) @ H @ D2
-        # and further rewritten as:
-        #    D1 @ H @ D1 - D2 @ H @ D2 + 2 * (Q1 - W) @ H @ (D1 - D2) - 2 * (Q2 - Q1) @ H @ D2
-
-        # Change due to the diagonal term
-        #    D1 @ H @ D1 - D2 @ H @ D2
-        H_diag = self.H[best, best]
-        t1 = H_diag * (np.square(D1) - np.square(D2))
-
-        # Change due to the interaction term
-        #     2 * (Q1 - W) @ H @ (D1 - D2)
-        rng = np.arange(len(inds))
-        Q = self.Q[inds].copy()
-        Q[rng, best] = old_vals
-        W = self.W[inds].copy()
-        t2 = 0  # TODO
-        import pdb
-
-        pdb.set_trace()
-
-        # Change due to the diagonal term
-        t3 = 2 * H_diag * (Q1 - Q2) * D2
-
-        # Combine all of it
-        gains[inds] += t1 + t2 + t3
+        # gains[inds, best] += 2 * H_diag * (Q1 - Q2) * D2
 
     def do_move(self):
         change_up = self.gain_up.max(axis=1)
