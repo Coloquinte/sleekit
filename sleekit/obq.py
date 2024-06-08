@@ -279,9 +279,7 @@ class LocalSearchQuantizer:
             inds,
             best,
             old_vals,
-            new_vals,
             old_vals_up,
-            vals_up,
             self.Q_up,
         )
         self.update_gains(
@@ -289,15 +287,14 @@ class LocalSearchQuantizer:
             inds,
             best,
             old_vals,
-            new_vals,
             old_vals_down,
-            vals_down,
             self.Q_down,
         )
 
-    def update_gains(
-        self, gains, inds, changed, old_vals, new_vals, old_cands, new_cands, candidates
-    ):
+    def update_gains(self, gains, inds, changed, old_vals, old_cands, candidates):
+        """
+        Update the gains, assuming the change in values and candidates happened already.
+        """
         rng = np.arange(len(inds))
         H = self.H
         W = self.W[inds].copy()
@@ -306,13 +303,11 @@ class LocalSearchQuantizer:
         Q1_F = self.Q[inds].copy()
         Q1_F[rng, changed] = old_vals
         Q2_F = self.Q[inds].copy()
-        Q2_F[rng, changed] = new_vals
         C2_F = candidates[inds].copy()
-        C2_F[rng, changed] = new_cands
         D2_F = C2_F - Q2_F
 
         # Sparse expressions, only containing the changed values
-        C1, C2, Q1, Q2 = old_cands, new_cands, old_vals, new_vals
+        C1, C2, Q1, Q2 = old_cands, C2_F[rng, changed], old_vals, Q2_F[rng, changed]
         D1, D2 = C1 - Q1, C2 - Q2
         H_diag = np.diag(self.H)[changed]
 
