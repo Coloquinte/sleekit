@@ -46,7 +46,7 @@ roots = sorted(
 
 rel_error = []
 
-msg = "Data\tStandard\tCorrection\tScaling\tScalingBiasOrder\tScalingOrder\tScalingBias"
+msg = "Data\tStandard\tCorrection\tScaling\tScalingBiasOrder\tScalingOrder\tScalingBias\tScalingBiasOrderLS100"
 
 print(msg)
 
@@ -120,6 +120,14 @@ for root in it:
     scaling_bias_error = quantization_error(
         weight, scaling_bias_weight, H=corrected_hessian
     )
-    msg = f"{name}\t{standard_error}\t{correction_error}\t{scaling_error}\t{scaling_bias_order_error}\t{scaling_order_error}\t{scaling_bias_error}"
+    # Scaling + integrated bias correction + improved ordering + local search
+    scaling_bias_order_ls100_weight = quantize_with_scaling(
+        weight, sc, cb, H=corrected_hessian, act_order="sqerr", nb_ls_moves=100
+    )
+    scaling_bias_order_ls100_error = quantization_error(
+        weight, scaling_bias_order_ls100_weight, H=corrected_hessian
+    )
+
+    msg = f"{name}\t{standard_error}\t{correction_error}\t{scaling_error}\t{scaling_bias_order_error}\t{scaling_order_error}\t{scaling_bias_error}\t{scaling_bias_order_ls100_error}"
 
     it.write(msg)
