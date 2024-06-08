@@ -156,6 +156,40 @@ def export_scaling_graph(b):
     plt.clf()
 
 
+def export_local_search_graph(b):
+    try:
+        data = pandas.read_csv(f"results/local_search_{b}b.csv", sep="\t")
+    except FileNotFoundError:
+        return
+    gptq = [1.0 for d in data["GPTQ"]]
+    ls10 = sorted(data["GPTQ+LS10"] / data["GPTQ"], reverse=True)
+    ls100 = sorted(data["GPTQ+LS100"] / data["GPTQ"], reverse=True)
+    geomean_ls10 = 100 * np.exp(np.mean(np.log(ls10))) - 100
+    geomean_ls100 = 100 * np.exp(np.mean(np.log(ls100))) - 100
+    print(f"Local search {b}b: 10 moves {geomean_ls10:+.2f}%, 100 moves {geomean_ls100:+.2f}%")
+
+    plt.title(f"Impact of local search ({b}-bit); lower is better")
+    plt.xlabel("Layers")
+    plt.ylabel("Error relative to no local search (%)")
+    plt.yscale("log")
+    plt.xlim(left=0, right=len(data) - 1)
+    plt.ylim(bottom=0.125, top=2.0)
+
+    yticks = [0.2, 0.3, 0.4, 0.5, 0.6, 0.8, 1.0, 1.2, 1.5, 2.0]
+    plt.gca().set_yticks([])
+    plt.gca().set_yticks([], minor=True)
+    plt.gca().set_yticks(yticks)
+    plt.gca().set_yticklabels([f"{100 * (t - 1):+.0f}%" for t in yticks])
+
+    plt.plot(gptq, label="No local search")
+    plt.plot(ls10, label="10 moves")
+    plt.plot(ls100, label="100 moves")
+    plt.legend()
+    plt.savefig(f"results/local_search_{b}b.png")
+    # plt.show()
+    plt.clf()
+
+
 def export_bits_graph():
     try:
         data = pandas.read_csv(f"results/bits.csv", sep="\t")
@@ -171,7 +205,9 @@ def export_bits_graph():
     geomean_d2 = np.exp(np.mean(np.log(d2)))
     geomean_d1_5 = np.exp(np.mean(np.log(d1_5)))
     geomean_d1 = np.exp(np.mean(np.log(d1)))
-    print(f"Bits: 2.8b x{geomean_d2_8:.2f}, 2.3b x{geomean_d2_3:.2f}, 2b x{geomean_d2:.2f}, 1.5b x{geomean_d1_5:.2f}, 1b x{geomean_d1:.2f}")
+    print(
+        f"Bits: 2.8b x{geomean_d2_8:.2f}, 2.3b x{geomean_d2_3:.2f}, 2b x{geomean_d2:.2f}, 1.5b x{geomean_d1_5:.2f}, 1b x{geomean_d1:.2f}"
+    )
 
     plt.title(f"Impact of the number of bits; lower is better")
     plt.xlabel("Layers")
@@ -197,12 +233,14 @@ def export_bits_graph():
     plt.clf()
 
 
-for b in [1, 1.5, 2, 3]:
+for b in [3, 2, 1.5, 1]:
     export_ordering_graph(b)
-for b in [1, 1.5, 2, 3]:
+for b in [3, 2, 1.5, 1]:
     export_correction_graph(b)
-for b in [1, 1.5, 2, 3]:
+for b in [3, 2, 1.5, 1]:
     export_compare_graph(b)
-for b in [1, 1.5, 2, 3]:
+for b in [3, 2, 1.5, 1]:
     export_scaling_graph(b)
+for b in [3, 2, 1.5, 1]:
+    export_local_search_graph(b)
 export_bits_graph()
