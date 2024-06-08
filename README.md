@@ -18,13 +18,15 @@ Sleekit uses a very generic quantization method. The steps to quantize a layer a
 
 ## Improvements
 
-We present two generic improvements that can be applied to any quantization method.
-One targets the scaling step, and allows to select better scaling factors. The other targets the weight optimization step, and can significantly reduce the layer error.
+We present deveral generic improvements that can be applied to any quantization method.
+They will target both the scaling step, to select better scaling factors, and the weight optimization step to reduce the layer error.
 
-## Methodology
+### Methodology: layer-per-layer analysis
 
 To develop our methods we analyze the effect of quantization decisions on a per-layer basis.
-Since post-training quantization operates at the layer level, this gives us a much more precise view of quantization behaviour than network-level metrics, and allows for rapid iteration.
+Despite many previous works using network-level metrics, post-training quantization methods minimize the error at the layer level.
+Analyzing the error at the layer level is therefore the natural approach.
+Moreover, network-level metrics have a tendency to be noisy, can hide small quantization errors or on the contrary be over-sensitive to some layers.
 
 Our baseline for comparison is the [GPTQ](https://arxiv.org/abs/2210.17323) algorithm with 3-bit and 1.5-bit weights.
 For the layer weights and metrics, we use layer statistics from a full accuracy run on several smaller networks (OPT-125M, OPT-350M, BLOOM-560M).
@@ -47,10 +49,10 @@ We test three different approaches to scaling, and compare the layer error after
 <img src="results/scaling_1.5b.png" width=45%><img src="results/scaling_3b.png" width=45%>
 
 The usual approach of minimizing the MSE yields results that are far from optimal.
-Using the full hessian matrix or its diagonal yields similar results that are on average much better than MSE alone.
-However, they are still far from the theoretical optimum of integrating the weight optimization algorithm with the scaling method.
+Using the full hessian matrix or its diagonal yields similar results that are on average much better than MSE alone, although they are still far from the theoretical optimum of integrating the weight optimization algorithm with the scaling method.
 
-### Trick 2: adding bias correction
+
+### Trick 2: combining with bias correction
 
 [Bias correction](https://arxiv.org/abs/1810.05723) is a method used to reduce the impact of quantization on a layer.
 Newer quantization methods behave much better, and it is not used much anymore.
@@ -69,6 +71,16 @@ While it is always an improvement in theory, bias correction can play havoc with
 Adding bias correction after optimization, or picking the best of the two results, is always better than the baseline.
 Unsurprisingly, it has more impact with a more agressive quantization.
 
+### Trick 3: adding local search
+
+The weight optimization problem is NP-hard, and can only be solved at scale in an approximate manner.
+GPTQ provides a good heuristic for it, however the heuristic of choice to obtain good solutions to similar problems (QUBO) is a simple local search.
+For this reason, we test the effect of applying a few local search moves after GPTQ, in a best-first manner.
+
+<img src="results/local_search_1.5b.png" width=45%><img src="results/local_search_3b.png" width=45%>
+
+The effect of just a few local search moves is notable on many layers, and applying them after GPTQ can drastically reduce layer error.
+
 ### Minor tricks
 
 We obtain a small improvement by modifying the ordering used for the GPTQ algorithm in weight optimization. GPTQ uses the weights on the diagonal of the matrix, but multiplying them by the sum of squares of the quantization error (without correction) yields a small but significant improvement.
@@ -83,15 +95,20 @@ The following approaches did not yield promising results and were abandoned:
 
 ### Putting it all together
 
-Finally, we put all these algorithms together in Sleekit.
-The hessian matrix is modified to represent the effect of bias correction.
-Scaling is performed based on its diagonal, and weight correction uses our slightly improved ordering.
-The computational cost of the algorithm is not increased, and there are many ways to improve the quality of the results for a penalty in quantization time.
-For example we could run several of the above methods and pick the best.
+Finally, we put these algorithms together in Sleekit:
+
+1. the hessian matrix is modified to represent the effect of bias correction;
+2. scaling is performed based on the hessian diagonal;
+3. weight optimization uses our slightly improved ordering.
+
+The computational cost of the algorithm is not increased so far compared to GPTQ. At the cost of additional computations we add:
+
+4. local search is performed during weight optimization for 100 moves.
+
+
+The various tricks interact well, and their benefits seem to stack, reducing the squared error by one third on average.
 
 <img src="results/compare_1.5b.png" width=45%><img src="results/compare_3b.png" width=45%>
-
-The various tricks interact well, and their benefits seem to stack.
 
 ## References
 
