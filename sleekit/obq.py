@@ -275,55 +275,64 @@ class LocalSearchQuantizer:
         self.err[inds] -= change
         # Update the gains
         self.update_gains(
-            self.gain_up, inds, best, old_vals, new_vals, old_vals_up, vals_up, self.Q_up
+            self.gain_up,
+            inds,
+            best,
+            old_vals,
+            new_vals,
+            old_vals_up,
+            vals_up,
+            self.Q_up,
         )
         self.update_gains(
-            self.gain_down, inds, best, old_vals, new_vals, old_vals_down, vals_down, self.Q_down
+            self.gain_down,
+            inds,
+            best,
+            old_vals,
+            new_vals,
+            old_vals_down,
+            vals_down,
+            self.Q_down,
         )
 
-    def update_gains(self, gains, inds, best, old_vals, new_vals, old_cands, new_cands, candidates):
+    def update_gains(
+        self, gains, inds, changed, old_vals, new_vals, old_cands, new_cands, candidates
+    ):
         rng = np.arange(len(inds))
         H = self.H
         W = self.W[inds].copy()
-        old_Q = self.Q[inds].copy()
-        old_Q[rng, best] = old_vals
-        new_Q = self.Q[inds].copy()
-        new_Q[rng, best] = new_vals
-        old_candidates = candidates[inds].copy()
-        old_candidates[rng, best] = old_cands
-        new_candidates = candidates[inds].copy()
-        new_candidates[rng, best] = new_cands
-        # old_gains = gains[inds]
-        # gains[inds] = compute_gain(W, new_Q, H, new_candidates)
 
-        # Full-matrix expression
-        old_delta = old_Q - W
-        old_D = old_candidates - old_Q
-        new_delta = new_Q - W
-        new_D = new_candidates - new_Q
+        # Full-matrix expressions
+        Q1_F = self.Q[inds].copy()
+        Q1_F[rng, changed] = old_vals
+        Q2_F = self.Q[inds].copy()
+        Q2_F[rng, changed] = new_vals
+        C2_F = candidates[inds].copy()
+        C2_F[rng, changed] = new_cands
+        D2_F = C2_F - Q2_F
 
-        # Sparse expressions
+        # Sparse expressions, only containing the changed values
         C1, C2, Q1, Q2 = old_cands, new_cands, old_vals, new_vals
         D1, D2 = C1 - Q1, C2 - Q2
-        H_diag = self.H[best, best]
+        H_diag = np.diag(self.H)[changed]
 
         # Change due to the diagonal term
         #    D1 @ H @ D1 - D2 @ H @ D2
-        gains[inds, best] += H_diag * (np.square(D1) - np.square(D2))
+        gains[inds, changed] += H_diag * (np.square(D1) - np.square(D2))
         # Or with full matrix expression
-        #    gains[inds] += (np.square(old_D) - np.square(new_D)) * np.diag(H)
+        #    gains[inds] += (np.square(D1_F) - np.square(D2_F)) * np.diag(H)
 
         # Change due to the interaction term, part 1
         #    2 * (Q1 - W) @ H @ (D1 - D2)
-        gains[inds, best] += 2 * ((old_Q - W) * H[best]).sum(axis=-1) * (D1 - D2)
+        gains[inds, changed] += 2 * ((Q1_F - W) * H[changed]).sum(axis=-1) * (D1 - D2)
         # Or with full matrix expression
-        #    gains[inds] += 2 * ((old_Q - W) @ H) * (old_D - new_D)
+        #    gains[inds] += 2 * ((Q1_F - W) @ H) * (D1_F - D2_F)
 
         # Change due to the interaction term, part 2
         #    2 * (Q1 - Q2) @ H @ D2
-        gains[inds] += 2 * ((Q1 - Q2) * H[:, best]).T * new_D
+        gains[inds] += 2 * ((Q1 - Q2) * H[:, changed]).T * D2_F
         # Or with full matrix expression
-        #    gains[inds] += 2 * ((old_Q - new_Q) @ H) * new_D
+        #    gains[inds] += 2 * ((Q1_F - new_Q) @ H) * D2_F
 
     def do_move(self):
         change_up = self.gain_up.max(axis=1)
