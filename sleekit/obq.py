@@ -302,19 +302,6 @@ class LocalSearchQuantizer:
         new_delta = new_Q - W
         new_D = new_candidates - new_Q
 
-
-        # Change due to the diagonal term
-        #    D1 @ H @ D1 - D2 @ H @ D2
-        # gains[inds] += (np.square(old_D) - np.square(new_D)) * np.diag(H)
-
-        # Change due to the interaction term
-        #    2 * (Q1 - W) @ H @ (D1 - D2)
-        gains[inds] += 2 * ((old_Q - W) @ H) * (old_D - new_D)
-
-        # Change due to the diagonal term
-        #    2 * (Q1 - Q2) @ H @ D2
-        gains[inds] += 2 * ((old_Q - new_Q) @ H) * new_D
-
         # Sparse expressions
         C1, C2, Q1, Q2 = old_cands, new_cands, old_vals, new_vals
         D1, D2 = C1 - Q1, C2 - Q2
@@ -323,14 +310,20 @@ class LocalSearchQuantizer:
         # Change due to the diagonal term
         #    D1 @ H @ D1 - D2 @ H @ D2
         gains[inds, best] += H_diag * (np.square(D1) - np.square(D2))
+        # Or with full matrix expression
+        #    gains[inds] += (np.square(old_D) - np.square(new_D)) * np.diag(H)
 
-        # Change due to the interaction term
+        # Change due to the interaction term, part 1
         #    2 * (Q1 - W) @ H @ (D1 - D2)
-        # TODO
+        gains[inds, best] += 2 * ((old_Q - W) * H[best]).sum(axis=-1) * (D1 - D2)
+        # Or with full matrix expression
+        #    gains[inds] += 2 * ((old_Q - W) @ H) * (old_D - new_D)
 
-        # Change due to the diagonal term
+        # Change due to the interaction term, part 2
         #    2 * (Q1 - Q2) @ H @ D2
-        # gains[inds, best] += 2 * H_diag * (Q1 - Q2) * D2
+        gains[inds] += 2 * ((Q1 - Q2) * H[:, best]).T * new_D
+        # Or with full matrix expression
+        #    gains[inds] += 2 * ((old_Q - new_Q) @ H) * new_D
 
     def do_move(self):
         change_up = self.gain_up.max(axis=1)
