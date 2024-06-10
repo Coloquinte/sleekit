@@ -11,6 +11,14 @@ from modelutils import *
 import tqdm
 
 
+def is_bloom(model_name):
+    return model_name.startswith("bigscience/bloom")
+
+
+def is_opt(model_name):
+    return model_name.startswith("facebook/opt")
+
+
 def get_model(model, force_fp32):
     def skip(*args, **kwargs):
         pass
@@ -20,12 +28,12 @@ def get_model(model, force_fp32):
     torch.nn.init.normal_ = skip
     dtype = torch.float32 if force_fp32 else "auto"
 
-    if model.startswith("facebook/opt"):
+    if is_opt(model):
         from transformers import OPTForCausalLM
 
         model = OPTForCausalLM.from_pretrained(model, torch_dtype=dtype)
         model.seqlen = model.config.max_position_embeddings
-    elif model.startswith("bigscience/bloom"):
+    elif is_bloom(model):
         from transformers import BloomForCausalLM
 
         model = BloomForCausalLM.from_pretrained(model, torch_dtype=dtype)
@@ -35,58 +43,8 @@ def get_model(model, force_fp32):
     return model
 
 
-@torch.no_grad()
-def extract_statistics(model, dataloader, args):
-    dev = args.device
-    use_cache = model.config.use_cache
-    model.config.use_cache = False
-    layers = model.model.decoder.layers
-
-    model.model.decoder.embed_tokens = model.model.decoder.embed_tokens.to(dev)
-    model.model.decoder.embed_positions = model.model.decoder.embed_positions.to(dev)
-    if hasattr(model.model.decoder, "project_out") and model.model.decoder.project_out:
-        model.model.decoder.project_out = model.model.decoder.project_out.to(dev)
-    if hasattr(model.model.decoder, "project_in") and model.model.decoder.project_in:
-        model.model.decoder.project_in = model.model.decoder.project_in.to(dev)
-    layers[0] = layers[0].to(dev)
-
-    dtype = next(iter(model.parameters())).dtype
-    inps = torch.zeros(
-        (args.nsamples, model.seqlen, model.config.hidden_size), dtype=dtype, device=dev
-    )
-    cache = {"i": 0, "attention_mask": None}
-
-    class Catcher(nn.Module):
-        def __init__(self, module):
-            super().__init__()
-            self.module = module
-
-        def forward(self, inp, **kwargs):
-            inps[cache["i"]] = inp
-            cache["i"] += 1
-            cache["attention_mask"] = kwargs["attention_mask"]
-            raise ValueError
-
-    layers[0] = Catcher(layers[0])
-    for batch in dataloader:
-        try:
-            model(batch[0].to(dev))
-        except ValueError:
-            pass
-    layers[0] = layers[0].module
-
-    layers[0] = layers[0].cpu()
-    model.model.decoder.embed_tokens = model.model.decoder.embed_tokens.cpu()
-    model.model.decoder.embed_positions = model.model.decoder.embed_positions.cpu()
-    if hasattr(model.model.decoder, "project_out") and model.model.decoder.project_out:
-        model.model.decoder.project_out = model.model.decoder.project_out.cpu()
-    if hasattr(model.model.decoder, "project_in") and model.model.decoder.project_in:
-        model.model.decoder.project_in = model.model.decoder.project_in.cpu()
-    torch.cuda.empty_cache()
-
+def extract_layer_statistics(layers, dev, inps, **kwargs):
     outs = torch.zeros_like(inps)
-    attention_mask = cache["attention_mask"]
-
     for i in tqdm.tqdm(range(len(layers))):
         layer = layers[i].to(dev)
 
@@ -106,7 +64,7 @@ def extract_statistics(model, dataloader, args):
             handles.append(subset[name].register_forward_hook(add_batch(name)))
 
         for j in tqdm.tqdm(range(args.nsamples), leave=False):
-            outs[j] = layer(inps[j].unsqueeze(0), attention_mask=attention_mask)[0]
+            outs[j] = layer(inps[j].unsqueeze(0), **kwargs)[0]
         for h in handles:
             h.remove()
 
@@ -119,6 +77,104 @@ def extract_statistics(model, dataloader, args):
         del layer
         del sleekit
         torch.cuda.empty_cache()
+
+
+class Catcher(nn.Module):
+    def __init__(self, module, inps, cache):
+        super().__init__()
+        self.module = module
+        self.cache = cache
+        self.cnt = 0
+        self.inps = inps
+
+    def forward(self, inp, **kwargs):
+        self.inps[self.cnt] = inp
+        self.cnt += 1
+        for k, v in kwargs.items():
+            self.cache[k] = v
+        raise ValueError
+
+
+def extract_inputs_opt(model, layers, dataloader, dev):
+    model.model.decoder.embed_tokens = model.model.decoder.embed_tokens.to(dev)
+    model.model.decoder.embed_positions = model.model.decoder.embed_positions.to(dev)
+    if hasattr(model.model.decoder, "project_out") and model.model.decoder.project_out:
+        model.model.decoder.project_out = model.model.decoder.project_out.to(dev)
+    if hasattr(model.model.decoder, "project_in") and model.model.decoder.project_in:
+        model.model.decoder.project_in = model.model.decoder.project_in.to(dev)
+    layers[0] = layers[0].to(dev)
+
+    dtype = next(iter(model.parameters())).dtype
+    inps = torch.zeros(
+        (args.nsamples, model.seqlen, model.config.hidden_size), dtype=dtype, device=dev
+    )
+
+    cache = {}
+    layers[0] = Catcher(layers[0], inps, cache)
+    for batch in dataloader:
+        try:
+            model(batch[0].to(dev))
+        except ValueError:
+            pass
+    layers[0] = layers[0].module
+
+    layers[0] = layers[0].cpu()
+    model.model.decoder.embed_tokens = model.model.decoder.embed_tokens.cpu()
+    model.model.decoder.embed_positions = model.model.decoder.embed_positions.cpu()
+    if hasattr(model.model.decoder, "project_out") and model.model.decoder.project_out:
+        model.model.decoder.project_out = model.model.decoder.project_out.cpu()
+    if hasattr(model.model.decoder, "project_in") and model.model.decoder.project_in:
+        model.model.decoder.project_in = model.model.decoder.project_in.cpu()
+    torch.cuda.empty_cache()
+    return inps, cache
+
+
+def extract_inputs_bloom(model, layers, dataloader, dev):
+    model.transformer.word_embeddings = model.transformer.word_embeddings.to(dev)
+    model.transformer.word_embeddings_layernorm = (
+        model.transformer.word_embeddings_layernorm.to(dev)
+    )
+    layers[0] = layers[0].to(dev)
+
+    dtype = next(iter(model.parameters())).dtype
+    inps = torch.zeros(
+        (args.nsamples, model.seqlen, model.config.hidden_size), dtype=dtype, device=dev
+    )
+
+    cache = {}
+    layers[0] = Catcher(layers[0], inps, cache)
+    for batch in dataloader:
+        try:
+            model(batch[0].to(dev))
+        except ValueError:
+            pass
+    layers[0] = layers[0].module
+
+    layers[0] = layers[0].cpu()
+    model.transformer.word_embeddings = model.transformer.word_embeddings.cpu()
+    model.transformer.word_embeddings_layernorm = (
+        model.transformer.word_embeddings_layernorm.cpu()
+    )
+    torch.cuda.empty_cache()
+    return inps, cache
+
+
+@torch.no_grad()
+def extract_statistics(model, dataloader, args):
+    dev = args.device
+    use_cache = model.config.use_cache
+    model.config.use_cache = False
+
+    if is_opt(args.model):
+        layers = model.model.decoder.layers
+        inps, cache = extract_inputs_opt(model, layers, dataloader, dev)
+    elif is_bloom(args.model):
+        layers = model.transformer.h
+        inps, cache = extract_inputs_bloom(model, layers, dataloader, dev)
+    else:
+        raise ValueError(f"Unsupported model {args.model}")
+
+    extract_layer_statistics(layers, dev, inps, **cache)
 
     model.config.use_cache = use_cache
 
