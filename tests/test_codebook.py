@@ -1,5 +1,5 @@
 import numpy as np
-from sleekit.codebook import Codebook
+from sleekit.codebook import Codebook, UniformCodebook
 from sleekit.codebook import lloyd_max
 
 
@@ -41,9 +41,20 @@ def test_repeated():
 
 
 def test_uniform():
-    values = np.array([1, 2, 4, 5, 7, 8, 10, 11], dtype=np.float32)
-    cb = Codebook.uniform(3, values.min(), values.max())
+    cb = Codebook.uniform(3, 1, 11)
     assert np.allclose(cb.values, [1.0, 6.0, 11.0])
+    assert np.allclose(cb.thresholds, [3.5, 8.5])
+    assert cb.min() == 1
+    assert cb.max() == 11
+    ucb = UniformCodebook(3, 1, 11)
+    assert np.allclose(ucb.values, cb.values)
+    assert ucb.min() == cb.min()
+    assert ucb.max() == cb.max()
+    data = 5 * np.random.randn(5, 10, 20)
+    assert np.allclose(ucb.quantize_index(data), cb.quantize_index(data))
+    assert np.allclose(ucb.quantize_value(data), cb.quantize_value(data))
+    assert np.allclose(ucb.quantize_up(data), cb.quantize_up(data))
+    assert np.allclose(ucb.quantize_down(data), cb.quantize_down(data))
 
 
 def test_equiprobable():

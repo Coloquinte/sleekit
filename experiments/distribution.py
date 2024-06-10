@@ -33,7 +33,7 @@ parser.add_argument("--save-data", type=str, help="Save the numpy data to this f
 args = parser.parse_args()
 
 data = []
-cb = Codebook.uniform(args.codebook_size, -1, 1)
+cb = UniformCodebook(args.codebook_size, -1, 1)
 
 roots = sorted(
     [

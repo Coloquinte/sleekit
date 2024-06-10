@@ -81,7 +81,7 @@ for root in it:
     msg = f"{name}\t{args.scaling}"
 
     for sz, b in bits:
-        cb = Codebook.uniform(sz, -1, 1)
+        cb = UniformCodebook(sz, -1, 1)
         sc = compute_scaling(
             weight,
             cb,

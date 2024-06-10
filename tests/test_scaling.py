@@ -1,6 +1,6 @@
 import numpy as np
 
-from sleekit.codebook import Codebook
+from sleekit.codebook import Codebook, UniformCodebook
 from sleekit.obq import quantization_error, random_psd_matrix
 from sleekit.scaling import (
     compute_norm_scaling,
@@ -72,7 +72,7 @@ def test_non_saturating_scaling():
 
 def test_non_saturating_scaling_high_dim():
     data = np.random.randn(10, 20, 30, 40).astype(np.float32)
-    cb = Codebook.uniform(9, -2, 2)
+    cb = UniformCodebook(9, -2, 2)
     sc = compute_non_saturating_scaling(data, cb, 0)
     assert len(sc) == 10
     sc = compute_non_saturating_scaling(data, cb, 1)
@@ -85,7 +85,7 @@ def test_non_saturating_scaling_high_dim():
 
 def test_min_mse_scaling():
     data = np.random.randn(20, 50).astype(np.float32)
-    cb = Codebook.uniform(9, -2, 2)
+    cb = UniformCodebook(9, -2, 2)
     sc = compute_min_mse_scaling(data, cb, 0)
     assert len(sc) == 20
     sc = compute_min_mse_scaling(data, cb, 1)
@@ -94,7 +94,7 @@ def test_min_mse_scaling():
 
 def test_min_mse_scaling_diag_hessian():
     data = np.random.randn(20, 50).astype(np.float32)
-    cb = Codebook.uniform(9, -2, 2)
+    cb = UniformCodebook(9, -2, 2)
     H = np.random.rand(50)
     sc = compute_min_mse_scaling(data, cb, 0, H=H)
     assert len(sc) == 20
@@ -105,7 +105,7 @@ def test_min_mse_scaling_diag_hessian():
 
 def test_min_mse_scaling_hessian():
     data = np.random.randn(20, 50).astype(np.float32)
-    cb = Codebook.uniform(9, -2, 2)
+    cb = UniformCodebook(9, -2, 2)
     H = random_psd_matrix(50, 10)
     sc = compute_min_mse_scaling(data, cb, 0, H=H)
     assert len(sc) == 20
@@ -116,7 +116,7 @@ def test_min_mse_scaling_hessian():
 
 def test_min_mse_scaling_obq():
     data = np.random.randn(20, 50).astype(np.float32)
-    cb = Codebook.uniform(9, -2, 2)
+    cb = UniformCodebook(9, -2, 2)
     H = random_psd_matrix(50, 10, damp=1.0e-6)
     sc = compute_min_mse_scaling(data, cb, 0, H=H, obq=True)
     assert len(sc) == 20
@@ -128,7 +128,7 @@ def test_min_mse_scaling_obq():
 def test_min_mse_scaling_quality():
     size = 100
     data = np.random.randn(20, size).astype(np.float32)
-    cb = Codebook.uniform(9, -3, 3)
+    cb = UniformCodebook(9, -3, 3)
     H = random_psd_matrix(size, 10, damp=1.0e-6)
     sc_base = compute_min_mse_scaling(data, cb, 0)
     sc_diag = compute_min_mse_scaling(data, cb, 0, H=np.diag(H))

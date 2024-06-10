@@ -1,6 +1,100 @@
 import numpy as np
 
 
+class UniformCodebook:
+    """
+    The simplest kind of codebook with evenly spaced values. Much faster for the common case.
+    """
+
+    def __init__(self, codebook_size, min_val, max_val):
+        self.codebook_size = int(codebook_size)
+        self.min_val = min_val
+        self.max_val = max_val
+        assert self.min_val < self.max_val
+        assert self.codebook_size >= 2
+
+    def __len__(self):
+        return self.codebook_size
+
+    @property
+    def values(self):
+        return np.linspace(self.min_val, self.max_val, self.codebook_size)
+
+    def min(self):
+        """
+        Minimum value in the codebook
+        """
+        return self.min_val
+
+    def max(self):
+        """
+        Maximum value in the codebook
+        """
+        return self.max_val
+
+    @property
+    def scale(self):
+        return (self.max_val - self.min_val) / (self.codebook_size - 1)
+
+    @property
+    def zero(self):
+        return self.min_val
+
+    def quantize_index(self, data):
+        """
+        Quantize data to their index in the codebook.
+        """
+        vals = data - self.zero
+        vals /= self.scale
+        vals = vals.round().clip(0, self.codebook_size - 1)
+        if len(self) <= 2**8:
+            return vals.astype(np.uint8)
+        if len(self) <= 2**16:
+            return vals.astype(np.uint16)
+        return vals.astype(np.uint32)
+
+    def quantize_value(self, data):
+        """
+        Quantize data to their value in the codebook.
+        """
+        vals = data - self.zero
+        vals /= self.scale
+        vals = vals.round().clip(0, self.codebook_size - 1)
+        vals *= self.scale
+        vals += self.zero
+        return vals
+
+    def quantize_up(self, data):
+        """
+        Quantize data to the value above in the codebook, saturating at the highest.
+        """
+        vals = data - self.zero
+        vals /= self.scale
+        vals += 1
+        vals = vals.round().clip(1, self.codebook_size - 1)
+        vals *= self.scale
+        vals += self.zero
+        return vals
+
+    def quantize_down(self, data):
+        """
+        Quantize data to the value below in the codebook, saturating at the lowest.
+        """
+        vals = data - self.zero
+        vals /= self.scale
+        vals -= 1
+        vals = vals.round().clip(0, self.codebook_size - 2)
+        vals *= self.scale
+        vals += self.zero
+        return vals
+
+    def __call__(self, data):
+        """
+        Quantize data to their value in the codebook.
+        """
+        return self.quantize_value(data)
+
+
 class Codebook:
     """
     A codebook gives a list of codebook values (sorted) and a list

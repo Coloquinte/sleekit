@@ -43,7 +43,7 @@ gp.add_argument(
 )
 args = parser.parse_args()
 
-cb = Codebook.uniform(args.codebook_size, -1, 1)
+cb = UniformCodebook(args.codebook_size, -1, 1)
 
 roots = sorted(
     [
