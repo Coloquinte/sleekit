@@ -51,7 +51,7 @@ def compute_non_saturating_scaling(data, codebook, axis=0):
 
 
 def quantize_with_scaling(
-    data, scale, quantizer, H=None, act_order="diag", nb_ls_moves=0
+    data, scale, quantizer, H=None, act_order="diag", damp=0.01, nb_ls_moves=0
 ):
     """
     Quantize the weights after applying a scaling factor.
@@ -68,7 +68,7 @@ def quantize_with_scaling(
     quant = apply_scaling(data, scale, 0)
     if H is not None:
         quant = quantize_opt(
-            quant, H, quantizer, act_order=act_order, nb_ls_moves=nb_ls_moves
+            quant, H, quantizer, act_order=act_order, damp=damp, nb_ls_moves=nb_ls_moves
         )
     else:
         quant = quantizer(quant)

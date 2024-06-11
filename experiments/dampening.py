@@ -84,10 +84,7 @@ for root in it:
     msg = f"{name}\t{args.scaling}"
 
     for damp in damps:
-        dampened_hessian = hessian + damp * hessian.diagonal().mean() * np.eye(
-            hessian.shape[0]
-        )
-        quant_weight = quantize_with_scaling(weight, sc, cb, H=dampened_hessian)
+        quant_weight = quantize_with_scaling(weight, sc, cb, H=hessian, damp=damp)
         quant_error = quantization_error(weight, quant_weight, H=hessian)
         msg += f"\t{quant_error}"
     it.write(msg)
