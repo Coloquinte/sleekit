@@ -14,7 +14,7 @@ parser.add_argument("dir", type=str, help="Directory containing the weights")
 parser.add_argument(
     "--codebook-size", type=int, default=4, help="Size of the codebook to use"
 )
-parser.add_argument("--damp", type=float, default=0.0001, help="Hessian dampening")
+parser.add_argument("--damp", type=float, default=0.01, help="Hessian dampening")
 gp = parser.add_argument_group("Optimization")
 gp.add_argument(
     "--grid-size", type=int, default=100, help="Grid size for error minimization"
@@ -52,7 +52,7 @@ for root in it:
     weight = np.load(os.path.join(root, "weight.npy")).astype(np.float32)
     standard_hessian = np.load(os.path.join(root, "hessian.npy")).astype(np.float32)
     mean = np.load(os.path.join(root, "mean.npy")).astype(np.float32)
-    remove_dead_values(standard_hessian, weight, damp=args.damp)
+    remove_dead_values(standard_hessian, weight)
     corrected_hessian = remove_input_bias(standard_hessian, mean)
     name = os.path.relpath(root, args.dir)
 
@@ -65,12 +65,12 @@ for root in it:
     )
     # Standard GPTQ
     standard_weight = quantize_with_scaling(
-        weight, sc, cb, H=standard_hessian, act_order="diag"
+        weight, sc, cb, H=standard_hessian, act_order="diag", damp=args.damp
     )
     standard_error = quantization_error(weight, standard_weight, H=standard_hessian)
     # Integrated bias correction only
     correction_weight = quantize_with_scaling(
-        weight, sc, cb, H=corrected_hessian, act_order="diag"
+        weight, sc, cb, H=corrected_hessian, act_order="diag", damp=args.damp
     )
     correction_error = quantization_error(
         weight, correction_weight, H=corrected_hessian
@@ -85,7 +85,7 @@ for root in it:
         max_factor=args.max_factor,
     )
     # Scaling only
-    scaling_weight = quantize_with_scaling(weight, sc, cb, H=standard_hessian)
+    scaling_weight = quantize_with_scaling(weight, sc, cb, H=standard_hessian, damp=args.damp)
     scaling_error = quantization_error(weight, scaling_weight, H=standard_hessian)
 
     sc = compute_min_mse_scaling(
@@ -98,28 +98,28 @@ for root in it:
     )
     # Scaling + integrated bias correction + improved ordering
     scaling_bias_order_weight = quantize_with_scaling(
-        weight, sc, cb, H=corrected_hessian, act_order="sqerr"
+        weight, sc, cb, H=corrected_hessian, act_order="sqerr", damp=args.damp
     )
     scaling_bias_order_error = quantization_error(
         weight, scaling_bias_order_weight, H=corrected_hessian
     )
     # Scaling + basic bias correction + improved ordering
     scaling_order_weight = quantize_with_scaling(
-        weight, sc, cb, H=standard_hessian, act_order="sqerr"
+        weight, sc, cb, H=standard_hessian, act_order="sqerr", damp=args.damp
     )
     scaling_order_error = quantization_error(
         weight, scaling_order_weight, H=corrected_hessian
     )
     # Scaling + integrated bias correction + basic ordering
     scaling_bias_weight = quantize_with_scaling(
-        weight, sc, cb, H=corrected_hessian, act_order="diag"
+        weight, sc, cb, H=corrected_hessian, act_order="diag", damp=args.damp
     )
     scaling_bias_error = quantization_error(
         weight, scaling_bias_weight, H=corrected_hessian
     )
     # Scaling + integrated bias correction + improved ordering + local search
     scaling_bias_order_ls100_weight = quantize_with_scaling(
-        weight, sc, cb, H=corrected_hessian, act_order="sqerr", nb_ls_moves=100
+        weight, sc, cb, H=corrected_hessian, act_order="sqerr", damp=args.damp, nb_ls_moves=100
     )
     scaling_bias_order_ls100_error = quantization_error(
         weight, scaling_bias_order_ls100_weight, H=corrected_hessian

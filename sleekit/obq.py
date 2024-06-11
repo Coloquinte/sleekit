@@ -25,19 +25,14 @@ def remove_input_bias(H, input_bias):
     return H - np.outer(input_bias, input_bias)
 
 
-def remove_dead_values(H, W, damp=0.01):
+def remove_dead_values(H, W):
     """
-    Make the Hessian diagonal non-zero, add dampening term, and zero out dead weights.
+    Make the Hessian diagonal non-zero and zero out dead weights.
     """
     mean_diag = H.diagonal().mean()
-
-    # Remove dead elements
     dead = H.diagonal() == 0
     H[dead, dead] = mean_diag
     W[:, dead] = 0
-
-    # Add dampening term
-    H += damp * mean_diag * np.eye(H.shape[0])
 
 
 def compute_hessian_chol(H):
@@ -166,7 +161,14 @@ def _cholesky_ordering(H):
 
 
 def quantize_opt(
-    W, H, quantizer, act_order="diag", min_block_size=32, num_blocks=8, nb_ls_moves=0
+    W,
+    H,
+    quantizer,
+    act_order="diag",
+    min_block_size=32,
+    num_blocks=8,
+    damp=0.01,
+    nb_ls_moves=0,
 ):
     """
     Quantize the weights with the given quantizer, minimizing the squared error using a GPTQ-like algorithm.
@@ -184,6 +186,7 @@ def quantize_opt(
     assert min_block_size >= 1
     W = W.astype(np.float32)
     H = H.astype(np.float32)
+    H = H + damp * H.diagonal().mean() * np.eye(H.shape[0])
 
     # Reorder if required, by order of decreasing diagonal elements
     if act_order == "err":
