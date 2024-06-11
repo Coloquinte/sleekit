@@ -1,7 +1,6 @@
 from sleekit.codebook import *
 from sleekit.obq import *
 from sleekit.scaling import *
-import matplotlib.pyplot as plt
 import os
 import tqdm
 
@@ -20,8 +19,6 @@ parser.add_argument(
     action="store_true",
     help="Use the hessian with bias correction for evaluation",
 )
-parser.add_argument("--show-figure", action="store_true", help="Show the graph")
-parser.add_argument("--save-figure", type=str, help="Save the figure to this file")
 
 gp = parser.add_argument_group("Scaling")
 gp.add_argument(
@@ -58,10 +55,6 @@ roots = sorted(
     ]
 )
 
-rel_error_diag = []
-rel_error_err = []
-rel_error_sqerr = []
-
 print("Data\tScaling\tDiag\tDiagErr\tDiagSqErr")
 it = tqdm.tqdm(roots)
 for root in it:
@@ -90,23 +83,3 @@ for root in it:
     sqerr_error = quantization_error(weight, sqerr_weight, H=hessian)
     name = os.path.relpath(root, args.dir)
     it.write(f"{name}\t{args.scaling}\t{diag_error}\t{err_error}\t{sqerr_error}")
-
-    rel_error_diag.append(diag_error / diag_error)
-    rel_error_err.append(err_error / diag_error)
-    rel_error_sqerr.append(sqerr_error / diag_error)
-
-if args.save_figure is not None or args.show_figure:
-    plt.plot(np.sort(rel_error_diag), label="Diagonal ordering")
-    plt.plot(np.sort(rel_error_err), label="Diag * error ordering")
-    plt.plot(np.sort(rel_error_sqerr), label="Diag * squared error ordering")
-    plt.ylim(bottom=0)
-    plt.legend()
-
-    plt.title("Relative error with different GPTQ orderings")
-    plt.xlabel("Layers")
-    plt.ylabel("Error relative to diagonal ordering")
-
-    if args.save_figure is not None:
-        plt.savefig(args.save_figure)
-    else:
-        plt.show()

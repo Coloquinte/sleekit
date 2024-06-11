@@ -1,7 +1,6 @@
 from sleekit.codebook import *
 from sleekit.obq import *
 from sleekit.scaling import *
-import matplotlib.pyplot as plt
 import os
 import tqdm
 

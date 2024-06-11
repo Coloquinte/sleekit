@@ -1,7 +1,6 @@
 from sleekit.codebook import *
 from sleekit.obq import *
 from sleekit.scaling import *
-import matplotlib.pyplot as plt
 import os
 import tqdm
 
@@ -43,8 +42,6 @@ roots = sorted(
         if "weight.npy" in files and "hessian.npy" in files and "mean.npy" in files
     ]
 )
-
-rel_error = []
 
 msg = "Data\tStandard\tCorrection\tScaling\tScalingBiasOrder\tScalingOrder\tScalingBias\tScalingBiasOrderLS100"
 

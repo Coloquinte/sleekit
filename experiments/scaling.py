@@ -1,7 +1,6 @@
 from sleekit.codebook import *
 from sleekit.obq import *
 from sleekit.scaling import *
-import matplotlib.pyplot as plt
 import os
 import tqdm
 
@@ -21,8 +20,6 @@ parser.add_argument(
     action="store_true",
     help="Use the hessian with bias correction for scaling and evaluation",
 )
-parser.add_argument("--show-figure", action="store_true", help="Show the graph")
-parser.add_argument("--save-figure", type=str, help="Save the figure to this file")
 gp = parser.add_argument_group("Optimization")
 gp.add_argument(
     "--grid-size", type=int, default=100, help="Grid size for error minimization"
@@ -62,11 +59,6 @@ roots = sorted(
     ]
 )
 
-rel_error_diag = []
-rel_error_hessian = []
-rel_error_obq = []
-rel_error_best = []
-
 
 msg = "Data\tMax\tMSE\tDiag"
 if args.run_hessian:
@@ -103,7 +95,6 @@ for root in it:
     )
     mse_weight = quantize_with_scaling(weight, sc, cb, H=gptq_hessian)
     mse_error = quantization_error(weight, mse_weight, H=eval_hessian)
-    best_error = 1.0
 
     sc = compute_min_mse_scaling(
         weight,
@@ -115,9 +106,6 @@ for root in it:
     )
     diag_weight = quantize_with_scaling(weight, sc, cb, H=gptq_hessian)
     diag_error = quantization_error(weight, diag_weight, H=eval_hessian)
-    err_diag = diag_error / mse_error
-    rel_error_diag.append(err_diag)
-    best_error = min(best_error, err_diag)
     msg = f"{name}\t{max_error}\t{mse_error}\t{diag_error}"
 
     if args.run_hessian:
@@ -131,9 +119,6 @@ for root in it:
         )
         hessian_weight = quantize_with_scaling(weight, sc, cb, H=gptq_hessian)
         hessian_error = quantization_error(weight, hessian_weight, H=eval_hessian)
-        err_hessian = hessian_error / mse_error
-        rel_error_hessian.append(err_hessian)
-        best_error = min(best_error, err_hessian)
         msg += f"\t{hessian_error}"
 
     if args.run_obq_aware:
@@ -148,29 +133,6 @@ for root in it:
         )
         obq_weight = quantize_with_scaling(weight, sc, cb, H=gptq_hessian)
         obq_error = quantization_error(weight, obq_weight, H=eval_hessian)
-        err_obq = obq_error / mse_error
-        rel_error_obq.append(err_obq)
-        best_error = min(best_error, err_obq)
         msg += f"\t{obq_error}"
 
     it.write(msg)
-    rel_error_best.append(best_error)
-
-if args.save_figure is not None or args.show_figure:
-    plt.plot(np.sort(rel_error_diag), label="Diagonal hessian scaling")
-    if args.run_hessian:
-        plt.plot(np.sort(rel_error_hessian), label="Hessian scaling")
-    if args.run_obq_aware:
-        plt.plot(np.sort(rel_error_obq), label="OBQ-aware scaling")
-    plt.plot(np.sort(rel_error_best), label="Best")
-    plt.ylim(bottom=0)
-    plt.legend()
-
-    plt.title("Relative error using Hessian scaling")
-    plt.xlabel("Layers")
-    plt.ylabel("Error relative to MSE")
-
-    if args.save_figure is not None:
-        plt.savefig(args.save_figure)
-    else:
-        plt.show()

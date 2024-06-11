@@ -1,7 +1,6 @@
 from sleekit.codebook import *
 from sleekit.obq import *
 from sleekit.scaling import *
-import matplotlib.pyplot as plt
 import os
 import tqdm
 
@@ -15,8 +14,6 @@ parser.add_argument(
     "--codebook-size", type=int, default=4, help="Size of the codebook to use"
 )
 parser.add_argument("--damp", type=float, default=0.0001, help="Hessian dampening")
-parser.add_argument("--show-figure", action="store_true", help="Show the graph")
-parser.add_argument("--save-figure", type=str, help="Save the figure to this file")
 
 gp = parser.add_argument_group("Scaling")
 gp.add_argument(
@@ -53,10 +50,6 @@ roots = sorted(
     ]
 )
 
-rel_error_plus_bias = []
-rel_error_with_bias = []
-rel_error_best = []
-
 print("Data\tScaling\tGPTQ\tGPTQ+BiasCorrection\tGPTQWithBiasCorrection")
 it = tqdm.tqdm(roots)
 for root in it:
@@ -88,24 +81,3 @@ for root in it:
     it.write(
         f"{name}\t{args.scaling}\t{gptq_error}\t{gptq_plus_bias_error}\t{gptq_with_bias_error}"
     )
-    err_plus_bias = gptq_plus_bias_error / gptq_error
-    err_with_bias = gptq_with_bias_error / gptq_error
-    rel_error_plus_bias.append(err_plus_bias)
-    rel_error_with_bias.append(err_with_bias)
-    rel_error_best.append(min(err_plus_bias, err_with_bias, 1.0))
-
-if args.save_figure is not None or args.show_figure:
-    plt.plot(np.sort(rel_error_plus_bias), label="Bias correction after GPTQ")
-    plt.plot(np.sort(rel_error_with_bias), label="Bias correction inside GPTQ")
-    plt.plot(np.sort(rel_error_best), label="Best")
-    plt.ylim(bottom=0)
-    plt.legend()
-
-    plt.title("Relative error adding bias correction to GPTQ")
-    plt.xlabel("Layers")
-    plt.ylabel("Error relative to GPTQ")
-
-    if args.save_figure is not None:
-        plt.savefig(args.save_figure)
-    else:
-        plt.show()
