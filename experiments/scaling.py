@@ -38,6 +38,31 @@ gp.add_argument(
 )
 gp = parser.add_argument_group("Additional experiments")
 gp.add_argument(
+    "--run-max",
+    action="store_true",
+    help="Run experiments with max mode",
+)
+gp.add_argument(
+    "--run-diag",
+    action="store_true",
+    help="Run experiments with diagonal scaling mode",
+)
+gp.add_argument(
+    "--run-diag1",
+    action="store_true",
+    help="Run experiments with diag1 scaling mode",
+)
+gp.add_argument(
+    "--run-diag3",
+    action="store_true",
+    help="Run experiments with diag3 scaling mode",
+)
+gp.add_argument(
+    "--run-diag10",
+    action="store_true",
+    help="Run experiments with diag10 scaling mode",
+)
+gp.add_argument(
     "--run-hessian",
     action="store_true",
     help="Run experiments with the slower full hessian scaling",
@@ -60,11 +85,30 @@ roots = sorted(
 )
 
 
-msg = "Data\tMax\tMSE\tDiag"
+msg = "Data\tMSE"
+modes = ["mse"]
+if args.run_max:
+    msg += "\tMax"
+    modes.append("max")
+if args.run_diag:
+    msg += "\tDiag"
+    modes.append("diag")
+if args.run_diag1:
+    msg += "\tDiag1"
+    modes.append("diag1")
+if args.run_diag3:
+    msg += "\tDiag3"
+    modes.append("diag3")
+if args.run_diag10:
+    msg += "\tDiag10"
+    modes.append("diag10")
 if args.run_hessian:
     msg += "\tHessian"
+    modes.append("hessian")
 if args.run_obq_aware:
     msg += "\tOBQAware"
+    modes.append("obq")
+
 
 print(msg)
 
@@ -74,65 +118,22 @@ for root in it:
     hessian = np.load(os.path.join(root, "hessian.npy")).astype(np.float32)
     mean = np.load(os.path.join(root, "mean.npy")).astype(np.float32)
     remove_dead_values(hessian, weight, damp=args.damp)
+    if args.correct_bias:
+        hessian = remove_input_bias(hessian, mean)
     name = os.path.relpath(root, args.dir)
 
-    gptq_hessian = hessian
-    if args.correct_bias:
-        eval_hessian = remove_input_bias(hessian, mean)
-    else:
-        eval_hessian = hessian
-
-    sc = compute_non_saturating_scaling(weight, cb)
-    max_weight = quantize_with_scaling(weight, sc, cb, H=gptq_hessian)
-    max_error = quantization_error(weight, max_weight, H=eval_hessian)
-
-    sc = compute_min_mse_scaling(
-        weight,
-        cb,
-        grid_size=args.grid_size,
-        min_factor=args.min_factor,
-        max_factor=args.max_factor,
-    )
-    mse_weight = quantize_with_scaling(weight, sc, cb, H=gptq_hessian)
-    mse_error = quantization_error(weight, mse_weight, H=eval_hessian)
-
-    sc = compute_min_mse_scaling(
-        weight,
-        cb,
-        grid_size=args.grid_size,
-        H=np.diag(eval_hessian),
-        min_factor=args.min_factor,
-        max_factor=args.max_factor,
-    )
-    diag_weight = quantize_with_scaling(weight, sc, cb, H=gptq_hessian)
-    diag_error = quantization_error(weight, diag_weight, H=eval_hessian)
-    msg = f"{name}\t{max_error}\t{mse_error}\t{diag_error}"
-
-    if args.run_hessian:
-        sc = compute_min_mse_scaling(
+    msg = f"{name}"
+    for mode in modes:
+        sc = compute_scaling(
             weight,
             cb,
+            H=hessian,
+            mode=mode,
             grid_size=args.grid_size,
-            H=eval_hessian,
             min_factor=args.min_factor,
             max_factor=args.max_factor,
         )
-        hessian_weight = quantize_with_scaling(weight, sc, cb, H=gptq_hessian)
-        hessian_error = quantization_error(weight, hessian_weight, H=eval_hessian)
-        msg += f"\t{hessian_error}"
-
-    if args.run_obq_aware:
-        sc = compute_min_mse_scaling(
-            weight,
-            cb,
-            grid_size=args.grid_size,
-            H=eval_hessian,
-            obq=True,
-            min_factor=args.min_factor,
-            max_factor=args.max_factor,
-        )
-        obq_weight = quantize_with_scaling(weight, sc, cb, H=gptq_hessian)
-        obq_error = quantization_error(weight, obq_weight, H=eval_hessian)
-        msg += f"\t{obq_error}"
-
+        quant_weight = quantize_with_scaling(weight, sc, cb, H=hessian)
+        quant_error = quantization_error(weight, quant_weight, H=hessian)
+        msg += f"\t{quant_error}"
     it.write(msg)

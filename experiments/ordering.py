@@ -64,6 +64,7 @@ for root in it:
     remove_dead_values(hessian, weight, damp=args.damp)
     if args.correct_bias:
         hessian = remove_input_bias(hessian, mean)
+    name = os.path.relpath(root, args.dir)
 
     sc = compute_scaling(
         weight,
@@ -81,5 +82,4 @@ for root in it:
     err_error = quantization_error(weight, err_weight, H=hessian)
     sqerr_weight = quantize_with_scaling(weight, sc, cb, H=hessian, act_order="sqerr")
     sqerr_error = quantization_error(weight, sqerr_weight, H=hessian)
-    name = os.path.relpath(root, args.dir)
     it.write(f"{name}\t{args.scaling}\t{diag_error}\t{err_error}\t{sqerr_error}")

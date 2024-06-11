@@ -156,8 +156,13 @@ def compute_scaling(
     elif mode == "hessian":
         pass
     elif mode == "diag":
-        assert H.ndim == 2
         H = H.diagonal()
+    elif mode == "diag1":
+        H = H.diagonal() + 0.01 * H.diagonal().mean()
+    elif mode == "diag3":
+        H = H.diagonal() + 0.03 * H.diagonal().mean()
+    elif mode == "diag10":
+        H = H.diagonal() + 0.1 * H.diagonal().mean()
     elif mode == "obq":
         obq = True
     else:
