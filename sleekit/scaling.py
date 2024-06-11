@@ -10,7 +10,7 @@ def _broadcast_scaling(data, scale, axis):
     assert scale.ndim == 1
     new_shape = [1 for i in data.shape]
     new_shape[axis] = -1
-    return np.reshape(scale, new_shape)
+    return scale.reshape(new_shape)
 
 
 def apply_scaling(data, scale, axis=0):
@@ -156,7 +156,8 @@ def compute_scaling(
     elif mode == "hessian":
         pass
     elif mode == "diag":
-        H = np.diag(H)
+        assert H.ndim == 2
+        H = H.diagonal()
     elif mode == "obq":
         obq = True
     else:

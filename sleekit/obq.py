@@ -6,7 +6,7 @@ def random_psd_matrix(size, rank, damp=0.0):
     Generate a random positive semidefinite matrix of a given size from the Wishart distribution.
     """
     A = np.random.randn(size, rank).astype(np.float32)
-    H = np.matmul(A, A.T)
+    H = A @ A.T
     dampval = damp * np.linalg.norm(H, ord=2, axis=1)
     return H + dampval * np.eye(size)
 
@@ -29,10 +29,10 @@ def remove_dead_values(H, W, damp=0.01):
     """
     Make the Hessian diagonal non-zero, add dampening term, and zero out dead weights.
     """
-    mean_diag = np.mean(np.diag(H))
+    mean_diag = H.diagonal().mean()
 
     # Remove dead elements
-    dead = np.diag(H) == 0
+    dead = H.diagonal() == 0
     H[dead, dead] = mean_diag
     W[:, dead] = 0
 
@@ -82,7 +82,7 @@ def _quantize_opt_core(W, Hinv, quantizer):
     Core of the quantization algorithm, without block operations.
     """
     Q = W.copy()
-    E = np.zeros(W.shape, dtype=np.float32)
+    E = np.zeros_like(W)
     for i in range(W.shape[1]):
         # Quantize the column
         w = Q[:, i]
@@ -103,7 +103,7 @@ def _quantize_opt_block(W, Hinv, quantizer, min_block_size, num_blocks):
     if size <= min_block_size:
         return _quantize_opt_core(W, Hinv, quantizer)
     Q = W.copy()
-    E = np.zeros(W.shape, dtype=np.float32)
+    E = np.zeros_like(W)
     block_size = max((size + num_blocks - 1) // num_blocks, min_block_size)
     for i in range(0, W.shape[1], block_size):
         # Quantize the block
@@ -149,7 +149,7 @@ def _cholesky_ordering(H):
     order = np.arange(n)
     for k in range(n):
         # Find the pivot
-        pivot = np.argmax(np.abs(np.diag(L)[k:])) + k
+        pivot = np.argmax(np.abs(L.diagonal()[k:])) + k
         # Swap rows and columns
         L[[k, pivot], :] = L[[pivot, k], :]
         L[:, [k, pivot]] = L[:, [pivot, k]]
@@ -189,19 +189,19 @@ def quantize_opt(
     if act_order == "err":
         Q = quantizer(W)
         err = np.abs(Q - W).sum(axis=0)
-        order = np.argsort(-np.diag(H) * err)
+        order = (-H.diagonal() * err).argsort()
     elif act_order == "sqerr":
         Q = quantizer(W)
         sqerr = np.square(Q - W).sum(axis=0)
-        order = np.argsort(-np.diag(H) * sqerr)
+        order = (-H.diagonal() * sqerr).argsort()
     elif act_order == "combined_diag":
-        order = np.argsort(-np.diag(H) / np.diag(np.linalg.inv(H)))
+        order = (-H.diagonal() / np.linalg.inv(H).diagonal()).argsort()
     elif act_order == "inv_diag":
-        order = np.argsort(np.diag(np.linalg.inv(H)))
+        order = (np.linalg.inv(H).diagonal()).argsort()
     elif act_order == "pivot":
         order = _cholesky_ordering(H)
     elif act_order == "diag":
-        order = np.argsort(-np.diag(H))
+        order = (-H.diagonal()).argsort()
     elif act_order == "none":
         order = np.arange(W.shape[1])
     else:
@@ -223,7 +223,7 @@ def compute_gain(W, Q, H, candidates):
     """
     delta = Q - W
     D = candidates - Q
-    return -np.square(D) * np.diag(H) - 2 * (delta @ H) * D
+    return -np.square(D) * H.diagonal() - 2 * (delta @ H) * D
 
 
 class LocalSearchQuantizer:
@@ -310,7 +310,7 @@ class LocalSearchQuantizer:
         # Sparse expressions, only containing the changed values
         C1, C2, Q1, Q2 = old_cands, C2_F[rng, changed], old_vals, Q2_F[rng, changed]
         D1, D2 = C1 - Q1, C2 - Q2
-        H_diag = np.diag(self.H)[changed]
+        H_diag = self.H.diagonal()[changed]
 
         # Change due to the diagonal term
         #    D1 @ H @ D1 - D2 @ H @ D2
