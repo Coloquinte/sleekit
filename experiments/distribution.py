@@ -27,7 +27,7 @@ parser.add_argument(
 parser.add_argument(
     "--grid-size", type=int, default=100, help="Grid size for error minimization"
 )
-parser.add_argument("--damp", type=float, default=0.01, help="Hessian dampening")
+parser.add_argument("--damp", type=float, default=0.0001, help="Hessian dampening")
 parser.add_argument("--save-figure", type=str, help="Save the figure to this file")
 parser.add_argument("--save-data", type=str, help="Save the numpy data to this file")
 args = parser.parse_args()
@@ -46,7 +46,7 @@ roots = sorted(
 for root in tqdm.tqdm(roots):
     weight = np.load(os.path.join(root, "weight.npy")).astype(np.float32)
     hessian = np.load(os.path.join(root, "hessian.npy")).astype(np.float32)
-    remove_dead_values(hessian, weight, pcdamp=args.damp)
+    remove_dead_values(hessian, weight, damp=args.damp)
     if args.scaling == "norm":
         sc = compute_norm_scaling(weight)
     elif args.scaling == "max":

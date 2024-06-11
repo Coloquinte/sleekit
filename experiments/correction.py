@@ -14,7 +14,7 @@ parser.add_argument("dir", type=str, help="Directory containing the weights")
 parser.add_argument(
     "--codebook-size", type=int, default=4, help="Size of the codebook to use"
 )
-parser.add_argument("--damp", type=float, default=0.01, help="Hessian dampening")
+parser.add_argument("--damp", type=float, default=0.0001, help="Hessian dampening")
 parser.add_argument("--show-figure", action="store_true", help="Show the graph")
 parser.add_argument("--save-figure", type=str, help="Save the figure to this file")
 
@@ -63,7 +63,7 @@ for root in it:
     weight = np.load(os.path.join(root, "weight.npy")).astype(np.float32)
     hessian = np.load(os.path.join(root, "hessian.npy")).astype(np.float32)
     mean = np.load(os.path.join(root, "mean.npy")).astype(np.float32)
-    remove_dead_values(hessian, weight, pcdamp=args.damp)
+    remove_dead_values(hessian, weight, damp=args.damp)
     corrected_hessian = remove_input_bias(hessian, mean)
 
     sc = compute_scaling(

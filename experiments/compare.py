@@ -15,7 +15,7 @@ parser.add_argument("dir", type=str, help="Directory containing the weights")
 parser.add_argument(
     "--codebook-size", type=int, default=4, help="Size of the codebook to use"
 )
-parser.add_argument("--damp", type=float, default=0.01, help="Hessian dampening")
+parser.add_argument("--damp", type=float, default=0.0001, help="Hessian dampening")
 gp = parser.add_argument_group("Optimization")
 gp.add_argument(
     "--grid-size", type=int, default=100, help="Grid size for error minimization"
@@ -55,7 +55,7 @@ for root in it:
     weight = np.load(os.path.join(root, "weight.npy")).astype(np.float32)
     standard_hessian = np.load(os.path.join(root, "hessian.npy")).astype(np.float32)
     mean = np.load(os.path.join(root, "mean.npy")).astype(np.float32)
-    remove_dead_values(standard_hessian, weight, pcdamp=args.damp)
+    remove_dead_values(standard_hessian, weight, damp=args.damp)
     corrected_hessian = remove_input_bias(standard_hessian, mean)
     name = os.path.relpath(root, args.dir)
 

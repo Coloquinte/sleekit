@@ -11,7 +11,7 @@ parser = argparse.ArgumentParser(
     description="Analysis of the effect of the number of bits on the error"
 )
 parser.add_argument("dir", type=str, help="Directory containing the weights")
-parser.add_argument("--damp", type=float, default=0.01, help="Hessian dampening")
+parser.add_argument("--damp", type=float, default=0.0001, help="Hessian dampening")
 parser.add_argument(
     "--correct-bias",
     action="store_true",
@@ -74,7 +74,7 @@ for root in it:
     weight = np.load(os.path.join(root, "weight.npy")).astype(np.float32)
     hessian = np.load(os.path.join(root, "hessian.npy")).astype(np.float32)
     mean = np.load(os.path.join(root, "mean.npy")).astype(np.float32)
-    remove_dead_values(hessian, weight, pcdamp=args.damp)
+    remove_dead_values(hessian, weight, damp=args.damp)
     if args.correct_bias:
         hessian = remove_input_bias(hessian, mean)
     name = os.path.relpath(root, args.dir)

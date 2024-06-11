@@ -25,7 +25,7 @@ def remove_input_bias(H, input_bias):
     return H - np.outer(input_bias, input_bias)
 
 
-def remove_dead_values(H, W, pcdamp=0.01):
+def remove_dead_values(H, W, damp=0.01):
     """
     Make the Hessian diagonal non-zero, add dampening term, and zero out dead weights.
     """
@@ -37,7 +37,7 @@ def remove_dead_values(H, W, pcdamp=0.01):
     W[:, dead] = 0
 
     # Add dampening term
-    H += np.diag(np.full(H.shape[0], 0.01 * pcdamp * mean_diag))
+    H += damp * mean_diag * np.eye(H.shape[0])
 
 
 def compute_hessian_chol(H):
