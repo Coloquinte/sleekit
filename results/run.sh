@@ -20,6 +20,11 @@ python experiments/local_search.py data/ --codebook-size 4 | tee results/local_s
 python experiments/local_search.py data/ --codebook-size 3 | tee results/local_search_1.5b.csv
 python experiments/local_search.py data/ --codebook-size 2 | tee results/local_search_1b.csv
 
+python experiments/dampening.py data/ --codebook-size 8 | tee results/dampening_3b.csv
+python experiments/dampening.py data/ --codebook-size 4 | tee results/dampening_2b.csv
+python experiments/dampening.py data/ --codebook-size 3 | tee results/dampening_1.5b.csv
+python experiments/dampening.py data/ --codebook-size 2 | tee results/dampening_1b.csv
+
 python experiments/compare.py data/ --codebook-size 8 | tee results/compare_3b.csv
 python experiments/compare.py data/ --codebook-size 4 | tee results/compare_2b.csv
 python experiments/compare.py data/ --codebook-size 3 | tee results/compare_1.5b.csv
