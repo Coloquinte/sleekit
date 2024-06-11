@@ -87,7 +87,9 @@ def export_compare_graph(b):
     correction = sorted(data["Correction"] / data["Standard"], reverse=True)
     scaling = sorted(data["Scaling"] / data["Standard"], reverse=True)
     sleekit = sorted(data["ScalingBiasOrder"] / data["Standard"], reverse=True)
-    sleekit_ls100 = sorted(data["ScalingBiasOrderLS100"] / data["Standard"], reverse=True)
+    sleekit_ls100 = sorted(
+        data["ScalingBiasOrderLS100"] / data["Standard"], reverse=True
+    )
     geomean_correction = 100 * np.exp(np.mean(np.log(correction))) - 100
     geomean_scaling = 100 * np.exp(np.mean(np.log(scaling))) - 100
     geomean_sleekit = 100 * np.exp(np.mean(np.log(sleekit))) - 100
@@ -169,7 +171,9 @@ def export_local_search_graph(b):
     ls100 = sorted(data["GPTQ+LS100"] / data["GPTQ"], reverse=True)
     geomean_ls10 = 100 * np.exp(np.mean(np.log(ls10))) - 100
     geomean_ls100 = 100 * np.exp(np.mean(np.log(ls100))) - 100
-    print(f"Local search {b}b: 10 moves {geomean_ls10:+.2f}%, 100 moves {geomean_ls100:+.2f}%")
+    print(
+        f"Local search {b}b: 10 moves {geomean_ls10:+.2f}%, 100 moves {geomean_ls100:+.2f}%"
+    )
 
     plt.title(f"Impact of local search ({b}-bit); lower is better")
     plt.xlabel("Layers")
@@ -189,6 +193,54 @@ def export_local_search_graph(b):
     plt.plot(ls100, label="100 moves")
     plt.legend()
     plt.savefig(f"results/local_search_{b}b.png")
+    # plt.show()
+    plt.clf()
+
+
+def export_dampening_graph(b):
+    try:
+        data = pandas.read_csv(f"results/dampening_{b}b.csv", sep="\t")
+    except FileNotFoundError:
+        return
+    damp0_01 = [1.0 for d in data["Damp0.01"]]
+    damp0_001 = sorted(data["Damp0.001"] / data["Damp0.01"], reverse=True)
+    damp0_003 = sorted(data["Damp0.003"] / data["Damp0.01"], reverse=True)
+    damp0_03 = sorted(data["Damp0.03"] / data["Damp0.01"], reverse=True)
+    damp0_1 = sorted(data["Damp0.1"] / data["Damp0.01"], reverse=True)
+    damp0_3 = sorted(data["Damp0.3"] / data["Damp0.01"], reverse=True)
+    damp1_0 = sorted(data["Damp1.0"] / data["Damp0.01"], reverse=True)
+    geomean_damp0_001 = 100.0 * np.exp(np.mean(np.log(damp0_001))) - 100
+    geomean_damp0_003 = 100.0 * np.exp(np.mean(np.log(damp0_003))) - 100
+    geomean_damp0_03 = 100.0 * np.exp(np.mean(np.log(damp0_03))) - 100
+    geomean_damp0_1 = 100.0 * np.exp(np.mean(np.log(damp0_1))) - 100
+    geomean_damp0_3 = 100.0 * np.exp(np.mean(np.log(damp0_3))) - 100
+    geomean_damp1_0 = 100.0 * np.exp(np.mean(np.log(damp1_0))) - 100
+    print(
+        f"Dampening {b}b: 0.001 {geomean_damp0_001:+.2f}%, 0.003 {geomean_damp0_003:+.2f}%, 0.03 {geomean_damp0_03:+.2f}%, 0.1 {geomean_damp0_1:+.2f}%, 0.3 {geomean_damp0_3:+.2f}%, 1.0 {geomean_damp1_0:+.2f}%"
+    )
+
+    plt.title(f"Impact of dampening ({b}-bit); lower is better")
+    plt.xlabel("Layers")
+    plt.ylabel("Error relative to 1% dampening (%)")
+    plt.yscale("log")
+    plt.xlim(left=0, right=len(data) - 1)
+    plt.ylim(bottom=0.5, top=2.0)
+
+    yticks = [0.5, 0.6, 0.8, 1.0, 1.2, 1.5, 2.0]
+    plt.gca().set_yticks([])
+    plt.gca().set_yticks([], minor=True)
+    plt.gca().set_yticks(yticks)
+    plt.gca().set_yticklabels([f"{100 * (t - 1):+.0f}%" for t in yticks])
+
+    plt.plot(damp0_001, label="0.1%")
+    plt.plot(damp0_003, label="0.3%")
+    plt.plot(damp0_01, label="1%")
+    plt.plot(damp0_03, label="3%")
+    plt.plot(damp0_1, label="10%")
+    plt.plot(damp0_3, label="30%")
+    # plt.plot(damp1_0, label="100%")
+    plt.legend()
+    plt.savefig(f"results/dampening_{b}b.png")
     # plt.show()
     plt.clf()
 
@@ -246,4 +298,6 @@ for b in [3, 2, 1.5, 1]:
     export_scaling_graph(b)
 for b in [3, 2, 1.5, 1]:
     export_local_search_graph(b)
+for b in [3, 2, 1.5, 1]:
+    export_dampening_graph(b)
 export_bits_graph()

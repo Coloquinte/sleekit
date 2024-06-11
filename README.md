@@ -83,7 +83,9 @@ The effect of just a few local search moves is notable on many layers, and apply
 
 ### Minor tricks
 
-We obtain a small improvement by modifying the ordering used for the GPTQ algorithm in weight optimization. GPTQ uses the weights on the diagonal of the matrix, but multiplying them by the sum of squares of the quantization error (without correction) yields a small but significant improvement.
+Other tricks yield smaller but useful improvements:
+* Using a different ordering for GPTQ. GPTQ makes rounding decisions for the weights in a greedy manner; they obtain a good ordering using the diagonal of the matrix in decreasing order. We improve this slightly, and multiply this value by the sum of squares of the quantization error (without correction); this takes better account of the effect of saturation.
+* Using a different dampening for GPTQ. GPTQ does not behave well on ill-conditioned matrix, and adding a larger penalty term to the matrix paradoxically yields better results.
 
 ### The many tricks that do not work
 
