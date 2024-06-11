@@ -43,7 +43,7 @@ def get_model(model, force_fp32):
     return model
 
 
-def extract_layer_statistics(layers, dev, inps, **kwargs):
+def extract_layer_statistics(layers, dev, npy_format, inps, **kwargs):
     outs = torch.zeros_like(inps)
     for i in tqdm.tqdm(range(len(layers))):
         layer = layers[i].to(dev)
@@ -69,7 +69,9 @@ def extract_layer_statistics(layers, dev, inps, **kwargs):
             h.remove()
 
         for name in subset:
-            sleekit[name].export(os.path.join(args.path, f"{i}.{name}"))
+            sleekit[name].export(
+                os.path.join(args.path, f"{i}.{name}"), npy_format=npy_format
+            )
             sleekit[name].free()
 
         inps, outs = outs, inps
@@ -160,11 +162,7 @@ def extract_inputs_bloom(model, layers, dataloader, dev):
 
 
 @torch.no_grad()
-def extract_statistics(model, dataloader, args):
-    dev = args.device
-    use_cache = model.config.use_cache
-    model.config.use_cache = False
-
+def extract_inputs(model, dataloader, dev):
     if is_opt(args.model):
         layers = model.model.decoder.layers
         inps, cache = extract_inputs_opt(model, layers, dataloader, dev)
@@ -173,8 +171,17 @@ def extract_statistics(model, dataloader, args):
         inps, cache = extract_inputs_bloom(model, layers, dataloader, dev)
     else:
         raise ValueError(f"Unsupported model {args.model}")
+    return layers, inps, cache
 
-    extract_layer_statistics(layers, dev, inps, **cache)
+
+@torch.no_grad()
+def extract_statistics(model, dataloader, args):
+    dev = args.device
+    use_cache = model.config.use_cache
+    model.config.use_cache = False
+
+    layers, inps, cache = extract_inputs(model, dataloader, dev)
+    extract_layer_statistics(layers, dev, args.numpy, inps, **cache)
 
     model.config.use_cache = use_cache
 
@@ -197,10 +204,10 @@ if __name__ == "__main__":
         "--path", type=str, required=True, help="Destination directory for statistics."
     )
     parser.add_argument(
-        "--seed", type=int, default=0, help="Seed for sampling the calibration data."
+            "--seed", type=int, default=0, help="Seed for sampling the calibration data (default: %(default)d)."
     )
     parser.add_argument(
-        "--nsamples", type=int, default=128, help="Number of calibration data samples."
+        "--nsamples", type=int, default=128, help="Number of calibration data samples (default: %(default)d)."
     )
     parser.add_argument(
         "--device",
@@ -213,6 +220,11 @@ if __name__ == "__main__":
         "--force-fp32",
         action="store_true",
         help="Force float32 datatype for faster CPU inference",
+    )
+    parser.add_argument(
+        "--numpy",
+        action="store_true",
+        help="Export in numpy format",
     )
 
     args = parser.parse_args()
