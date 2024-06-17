@@ -13,14 +13,17 @@ class Sleekit:
     def __init__(self, layer):
         self.layer = layer
         weight = layer.weight
-        if isinstance(self.layer, nn.Conv1d):
-            weight = weight.flatten(1)
-        if isinstance(self.layer, nn.Conv2d):
+        if not isinstance(self.layer, (nn.Linear, nn.Conv1d, nn.Conv2d)):
+            raise ValueError(f"Unsupported layer type {type(self.layer)}")
+        if isinstance(self.layer, (nn.Conv1d, nn.Conv2d)):
             weight = weight.flatten(1)
         # TODO: handle transformers.Conv1D
         n = weight.shape[1]
+        # Mean of the inputs
         self.mean = torch.zeros(n, dtype=torch.float32, device=self.device)
+        # Mean of the hessian
         self.hessian = torch.zeros((n, n), dtype=torch.float32, device=self.device)
+        # Number of samples received
         self.count = 0
 
     @property
@@ -35,6 +38,8 @@ class Sleekit:
             inp = inp.reshape((-1, inp.shape[-1]))
             inp = inp.t()
         elif isinstance(self.layer, nn.Conv2d):
+            if inp.ndim == 3:
+                inp = torch.unsqueeze(inp, 0)
             inp = F.unfold(
                 inp,
                 self.layer.kernel_size,
@@ -45,24 +50,26 @@ class Sleekit:
             inp = inp.permute([1, 0, 2])
             inp = inp.flatten(1)
         elif isinstance(self.layer, nn.Conv1d):
+            if inp.ndim == 2:
+                inp = torch.unsqueeze(inp, 0)
             # Torch does not support 1D unfold so we do it manually
             inp = torch.unsqueeze(inp, -1)
             inp = F.unfold(
                 inp,
-                (self.layer.kernel_size, 1),
-                (self.layer.dilation, 1),
-                (self.layer.padding, 0),
-                (self.layer.stride, 1),
+                (self.layer.kernel_size[0], 1),
+                (self.layer.dilation[0], 1),
+                (self.layer.padding[0], 0),
+                (self.layer.stride[0], 1),
             )
             inp = inp.permute([1, 0, 2])
             inp = inp.flatten(1)
         else:
-            raise RuntimeError("Unsupported layer type")
+            raise RuntimeError(f"Unsupported layer type {type(self.layer)}")
         assert inp.ndim == 2
         inp = inp.float()
         return inp
 
-    def add_batch(self, inp, out):
+    def add_batch(self, inp, out=None):
         """
         Add a new batch to the statistics
         """
@@ -93,10 +100,11 @@ class Sleekit:
             torch.save(self.mean.cpu(), os.path.join(path, "mean.pt"))
             torch.save(self.hessian.cpu(), os.path.join(path, "hessian.pt"))
 
-    def quantize(self, cb):
+    def quantize(self, cb, scaling_mode="mse", order_mode="diag", bias_correction=False, damp=0.01, nb_ls_moves=0):
         """
-        Quantize the layer using the given codebook
+        Quantize the layer using the given codebook.
         """
+
         raise RuntimeError("Quantization is not implemented yet")
 
     def free(self):
