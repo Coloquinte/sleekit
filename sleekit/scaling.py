@@ -32,7 +32,7 @@ def compute_norm_scaling(data, axis=0):
     Compute a scaling factor over this axis to have squared average equal to 1.
     """
     other_axes = tuple(i for i in range(data.ndim) if i != axis)
-    sqnorm = np.mean(np.square(data), axis=other_axes)
+    sqnorm = np.square(data).mean(axis=other_axes)
     return np.sqrt(np.maximum(sqnorm, 1.0e-16))
 
 
@@ -78,11 +78,11 @@ def quantize_with_scaling(
 
 def _compute_mse(H, E):
     if H is None:
-        return np.sum(np.square(E), axis=1)
+        return np.square(E).sum(axis=1)
     if H.ndim == 1:
         # Diagonal hessian
         assert E.shape[1] == H.shape[0]
-        return np.sum(np.expand_dims(H, 0) * np.square(E), axis=1)
+        return (np.expand_dims(H, 0) * np.square(E)).sum(axis=1)
     # Full hessian
     assert H.ndim == 2
     assert E.shape[1] == H.shape[0]

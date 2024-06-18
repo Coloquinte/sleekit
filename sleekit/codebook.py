@@ -200,14 +200,14 @@ class Codebook:
         """
         probs = self.probabilities(data)
         probs = probs[probs > 0]
-        return -np.sum(probs * np.log2(probs))
+        return -(probs * np.log2(probs)).sum()
 
     def mse(self, data):
         """
         Return the mean squared error of the data with this codebook.
         """
         quant = self.quantize_value(data)
-        return np.mean(np.square(data - quant))
+        return np.square(data - quant).mean()
 
     def centroids(self, data):
         """
@@ -348,7 +348,7 @@ def lloyd_max(
     Lloyd-Max algorithm for scalar quantization.
     Returns a codebook that minimizes a combination of the mse and the entropy.
     """
-    data = np.reshape(data, (-1,))
+    data = data.reshape((-1,))
     if sample_count is not None:
         nsamples = codebook_size * sample_count
         if nsamples < len(data):

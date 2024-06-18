@@ -132,7 +132,7 @@ def test_min_mse_scaling_quality():
     cb = UniformCodebook(9, -3, 3)
     H = random_psd_matrix(size, 10, damp=1.0e-6)
     sc_base = compute_min_mse_scaling(data, cb, 0)
-    sc_diag = compute_min_mse_scaling(data, cb, 0, H=np.diag(H))
+    sc_diag = compute_min_mse_scaling(data, cb, 0, H=H.diagonal())
     sc_hessian = compute_min_mse_scaling(data, cb, 0, H=H)
     sc_obq = compute_min_mse_scaling(data, cb, 0, H=H, obq=True)
     q_base = quantize_with_scaling(data, sc_base, cb)
