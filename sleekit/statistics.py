@@ -4,6 +4,10 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
+from sleekit.codebook import UniformCodebook
+from sleekit.obq import remove_input_bias
+from sleekit.scaling import compute_scaling, quantize_with_scaling
+
 
 class Sleekit:
     """
@@ -100,12 +104,90 @@ class Sleekit:
             torch.save(self.mean.cpu(), os.path.join(path, "mean.pt"))
             torch.save(self.hessian.cpu(), os.path.join(path, "hessian.pt"))
 
-    def quantize(self, cb, scaling_mode="mse", order_mode="diag", bias_correction=False, damp=0.01, nb_ls_moves=0):
+    def quantize_basic(self, nbits):
         """
-        Quantize the layer using the given codebook.
+        A typical quantization method, without our improvements.
         """
+        return self.quantize(
+            nbits,
+            scaling_mode="mse",
+            order_mode="diag",
+            bias_correction=False,
+            damp=0.01,
+            nb_ls_moves=0,
+        )
 
-        raise RuntimeError("Quantization is not implemented yet")
+    def quantize_sleekit_light(self, nbits):
+        """
+        Sleekit "light" version, with no computational cost
+        """
+        return self.quantize(
+            nbits,
+            scaling_mode="diag",
+            order_mode="sqerr",
+            bias_correction=True,
+            damp=0.03,
+            nb_ls_moves=0,
+        )
+
+    def quantize_sleekit_heavy(self, nbits):
+        """
+        Sleekit "heavy" version, with more intensive computations
+        """
+        return self.quantize(
+            nbits,
+            scaling_mode="hessian",
+            order_mode="sqerr",
+            bias_correction=True,
+            damp=0.03,
+            nb_ls_moves=100,
+        )
+
+    def quantize(
+        self,
+        nbits,
+        scaling_mode="mse",
+        order_mode="diag",
+        bias_correction=False,
+        damp=0.01,
+        nb_ls_moves=0,
+        grid_size=100,
+        min_factor=0.05,
+        max_factor=1.0,
+    ):
+        """
+        Quantize the layer to the required precision.
+        """
+        cb = UniformCodebook(2**nbits, -1, 1)
+        H = self.hessian.numpy()
+        mean = self.mean.numpy()
+        if bias_correction:
+            H = remove_input_bias(H, mean)
+        weight = self.layer.weight.data.flatten(1).numpy()
+        sc = compute_scaling(
+            weight,
+            cb,
+            H=H,
+            mode=scaling_mode,
+            grid_size=grid_size,
+            min_factor=min_factor,
+            max_factor=max_factor,
+        )
+        quant_weight = quantize_with_scaling(
+            weight,
+            sc,
+            cb,
+            H=H,
+            act_order=order_mode,
+            damp=damp,
+            nb_ls_moves=nb_ls_moves,
+        )
+
+        self.layer.weight.data = torch.from_numpy(quant_weight).reshape(self.layer.weight.shape)
+        if bias_correction:
+            err = torch.from_numpy(weight - quant_weight).flatten(1)
+            delta = (err * self.mean).sum(axis=1)
+            self.layer.bias.data += delta
 
     def free(self):
         """

@@ -44,3 +44,24 @@ def test_conv1d():
     assert stats.count == 6
     stats.add_batch(torch.randn(10, 7))
     assert stats.count == 11
+
+
+def test_quantize_linear():
+    layer = nn.Linear(10, 5)
+    stats = Sleekit(layer)
+    stats.add_batch(torch.randn(20, 10))
+    stats.quantize_sleekit_light(3)
+
+
+def test_quantize_conv1d():
+    layer = nn.Conv1d(10, 5, 3)
+    stats = Sleekit(layer)
+    stats.add_batch(torch.randn(20, 10, 5))
+    stats.quantize_sleekit_light(3)
+
+
+def test_quantize_conv2d():
+    layer = nn.Conv2d(10, 5, 3)
+    stats = Sleekit(layer)
+    stats.add_batch(torch.randn(20, 10, 5, 5))
+    stats.quantize_sleekit_light(3)
