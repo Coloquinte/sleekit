@@ -103,13 +103,11 @@ def quantization_error(W, Q, H):
     return channelwise_error(W, Q, H).mean()
 
 
-def _quantize_opt_core(W, Hinv, quantizer):
+def _quantize_opt_core(Q, E, Hinv, quantizer):
     """
     Core of the quantization algorithm, without block operations.
     """
-    Q = W.copy()
-    E = np.zeros_like(W)
-    for i in range(W.shape[1]):
+    for i in range(Q.shape[1]):
         # Quantize the column
         w = Q[:, i]
         q = quantizer(w)
@@ -118,31 +116,25 @@ def _quantize_opt_core(W, Hinv, quantizer):
         Q[:, i] = q
         # Now correct the error
         Q[:, i + 1 :] -= np.outer(err, Hinv[i, i + 1 :])
-    return (Q, E)
 
 
-def _quantize_opt_block(W, Hinv, quantizer, min_block_size, num_blocks):
+def _quantize_opt_block(Q, E, Hinv, quantizer, min_block_size, num_blocks):
     """
     Quantization algorithm using block operations for speed.
     """
-    size = W.shape[1]
+    size = Q.shape[1]
     if size <= min_block_size:
-        return _quantize_opt_core(W, Hinv, quantizer)
-    Q = W.copy()
-    E = np.zeros_like(W)
+        _quantize_opt_core(Q, E, Hinv, quantizer)
+        return
     block_size = max((size + num_blocks - 1) // num_blocks, min_block_size)
-    for i in range(0, W.shape[1], block_size):
+    for i in range(0, Q.shape[1], block_size):
         # Quantize the block
         e = min(i + block_size, size)
-        w = Q[:, i:e]
-        q, err = _quantize_opt_block(
-            w, Hinv[i:e, i:e], quantizer, min_block_size, num_blocks
+        _quantize_opt_block(
+            Q[:, i:e], E[:, i:e], Hinv[i:e, i:e], quantizer, min_block_size, num_blocks
         )
-        E[:, i:e] = err
-        Q[:, i:e] = q
         # Now correct the error
-        Q[:, e:] -= err @ Hinv[i:e, e:]
-    return (Q, E)
+        Q[:, e:] -= E[:, i:e] @ Hinv[i:e, e:]
 
 
 def _quantize_opt_ordered(W, H, quantizer, order, min_block_size, num_blocks):
@@ -155,7 +147,9 @@ def _quantize_opt_ordered(W, H, quantizer, order, min_block_size, num_blocks):
 
     # Apply the algorithm itself
     Hinv = compute_hessian_chol(H)
-    Q, _ = _quantize_opt_block(W, Hinv, quantizer, min_block_size, num_blocks)
+    Q = W.copy()
+    E = np.zeros_like(W)
+    _quantize_opt_block(Q, E, Hinv, quantizer, min_block_size, num_blocks)
 
     # Reverse reordering
     Q = Q[:, np.argsort(order)]
