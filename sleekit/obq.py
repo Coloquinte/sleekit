@@ -55,6 +55,37 @@ def compute_hessian_chol(H):
     return np.ascontiguousarray(H)
 
 
+def compute_hessian_order(W, H, quantizer, act_order):
+    # Reorder if required
+    if act_order == "err":
+        # Decreasing diagonal elements time error
+        Q = quantizer(W)
+        err = np.abs(Q - W).sum(axis=0)
+        return (-H.diagonal() * err).argsort()
+    elif act_order == "sqerr":
+        # Decreasing diagonal elements time squared error
+        Q = quantizer(W)
+        sqerr = np.square(Q - W).sum(axis=0)
+        return (-H.diagonal() * sqerr).argsort()
+    elif act_order == "combined_diag":
+        # Combination of diagonal and inverse diagonal
+        return (-H.diagonal() / np.linalg.inv(H).diagonal()).argsort()
+    elif act_order == "inv_diag":
+        # Diagonal elements of the inverse
+        return (np.linalg.inv(H).diagonal()).argsort()
+    elif act_order == "pivot":
+        # Pivoted Cholesky method
+        return _cholesky_ordering(H)
+    elif act_order == "diag":
+        # Diagonal elements of the matrix
+        return (-H.diagonal()).argsort()
+    elif act_order == "none":
+        # No reordering
+        return np.arange(W.shape[1])
+    else:
+        raise RuntimeError(f"Invalid act_order value {act_order}")
+
+
 def channelwise_error(W, Q, H):
     """
     Compute the channel error between two weight matrices given the hessian
@@ -188,28 +219,7 @@ def quantize_opt(
     H = H.astype(np.float32)
     H = H + damp * H.diagonal().mean() * np.eye(H.shape[0])
 
-    # Reorder if required, by order of decreasing diagonal elements
-    if act_order == "err":
-        Q = quantizer(W)
-        err = np.abs(Q - W).sum(axis=0)
-        order = (-H.diagonal() * err).argsort()
-    elif act_order == "sqerr":
-        Q = quantizer(W)
-        sqerr = np.square(Q - W).sum(axis=0)
-        order = (-H.diagonal() * sqerr).argsort()
-    elif act_order == "combined_diag":
-        order = (-H.diagonal() / np.linalg.inv(H).diagonal()).argsort()
-    elif act_order == "inv_diag":
-        order = (np.linalg.inv(H).diagonal()).argsort()
-    elif act_order == "pivot":
-        order = _cholesky_ordering(H)
-    elif act_order == "diag":
-        order = (-H.diagonal()).argsort()
-    elif act_order == "none":
-        order = np.arange(W.shape[1])
-    else:
-        raise RuntimeError(f"Invalid act_order value {act_order}")
-
+    order = compute_hessian_order(W, H, quantizer, act_order)
     Q = _quantize_opt_ordered(W, H, quantizer, order, min_block_size, num_blocks)
     Q = quantize_local_search(W, Q, H, quantizer, nb_ls_moves)
     return Q
