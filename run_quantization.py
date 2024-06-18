@@ -21,8 +21,19 @@ if __name__ == "__main__":
         help="Where to extract calibration data from.",
     )
     parser.add_argument(
-        "--path", type=str, required=True, help="Destination directory for statistics."
+        "--nbits",
+        type=int,
+        help="Number of bits for quantization.",
+        default=4,
     )
+    parser.add_argument(
+        "--type",
+        type=str,
+        help="Quantization type.",
+        default="sleekit-light",
+        choices=["basic", "sleekit-light", "sleekit-heavy"],
+    )
+    parser.add_argument("--checkpoint", type=str, help="Checkpoint to save.")
     parser.add_argument(
         "--seed",
         type=int,
@@ -47,11 +58,6 @@ if __name__ == "__main__":
         action="store_true",
         help="Force float32 datatype for faster CPU inference",
     )
-    parser.add_argument(
-        "--numpy",
-        action="store_true",
-        help="Export in numpy format",
-    )
 
     args = parser.parse_args()
 
@@ -66,4 +72,4 @@ if __name__ == "__main__":
         seqlen=model.seqlen,
     )
 
-    extract_statistics(model, dataloader, args)
+    quantize_model(model, dataloader, args)
