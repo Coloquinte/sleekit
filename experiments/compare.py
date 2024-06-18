@@ -80,7 +80,7 @@ for root in it:
         weight,
         cb,
         grid_size=args.grid_size,
-        H=np.diag(standard_hessian),
+        H=standard_hessian.diagonal(),
         min_factor=args.min_factor,
         max_factor=args.max_factor,
     )
@@ -92,7 +92,7 @@ for root in it:
         weight,
         cb,
         grid_size=args.grid_size,
-        H=np.diag(corrected_hessian),
+        H=corrected_hessian.diagonal(),
         min_factor=args.min_factor,
         max_factor=args.max_factor,
     )
