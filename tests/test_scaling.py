@@ -7,6 +7,7 @@ from sleekit.scaling import (
     apply_scaling,
     compute_non_saturating_scaling,
     compute_min_mse_scaling,
+    compute_scaling,
     quantize_with_scaling,
 )
 
@@ -145,3 +146,19 @@ def test_min_mse_scaling_quality():
     assert err_hessian <= err_base
     assert err_hessian <= err_diag
     assert err_obq <= err_hessian
+
+
+def test_scaling_modes():
+    size = 20
+    data = np.random.randn(20, size).astype(np.float32)
+    cb = UniformCodebook(9, -3, 3)
+    H = random_psd_matrix(size, 10, damp=1.0e-6)
+    compute_scaling(data, cb, H, mode="norm")
+    compute_scaling(data, cb, H, mode="max")
+    compute_scaling(data, cb, H, mode="mse")
+    compute_scaling(data, cb, H, mode="diag")
+    compute_scaling(data, cb, H, mode="hessian")
+    compute_scaling(data, cb, H, mode="diag1")
+    compute_scaling(data, cb, H, mode="hessian1")
+    compute_scaling(data, cb, H, mode="diag1.8")
+    compute_scaling(data, cb, H, mode="hessian1.8")

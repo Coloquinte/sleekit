@@ -153,16 +153,15 @@ def compute_scaling(
     obq = False
     if mode == "mse":
         H = None
-    elif mode == "hessian":
-        pass
-    elif mode == "diag":
+    elif mode.startswith("hessian"):
+        if len(mode) > 7:
+            penalty = 0.01 * float(mode[7:])
+            H = H + penalty * H.diagonal().mean() * np.eye(H.shape[0])
+    elif mode.startswith("diag"):
         H = H.diagonal()
-    elif mode == "diag1":
-        H = H.diagonal() + 0.01 * H.diagonal().mean()
-    elif mode == "diag3":
-        H = H.diagonal() + 0.03 * H.diagonal().mean()
-    elif mode == "diag10":
-        H = H.diagonal() + 0.1 * H.diagonal().mean()
+        if len(mode) > 4:
+            penalty = 0.01 * float(mode[4:])
+            H = H + penalty * H.mean()
     elif mode == "obq":
         obq = True
     else:
