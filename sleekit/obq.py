@@ -217,10 +217,10 @@ def quantize_opt(
     assert min_block_size >= 1
     W = W.astype(np.float32)
     H = H.astype(np.float32)
-    H = H + damp * H.diagonal().mean() * np.eye(H.shape[0])
 
-    order = compute_hessian_order(W, H, quantizer, act_order)
-    Q = _quantize_opt_ordered(W, H, quantizer, order, min_block_size, num_blocks)
+    dampened = H + damp * H.diagonal().mean() * np.eye(H.shape[0])
+    order = compute_hessian_order(W, dampened, quantizer, act_order)
+    Q = _quantize_opt_ordered(W, dampened, quantizer, order, min_block_size, num_blocks)
     Q = quantize_local_search(W, Q, H, quantizer, nb_ls_moves)
     return Q
 
