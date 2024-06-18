@@ -1,6 +1,4 @@
-import argparse
 import os
-import time
 
 import torch
 import torch.nn as nn
@@ -57,7 +55,7 @@ def get_model(model, force_fp32):
 
 def extract_layer_statistics(layers, args, inps, **kwargs):
     outs = torch.zeros_like(inps)
-    for i in tqdm.tqdm(range(len(layers))):
+    for i in tqdm.tqdm(range(len(layers)), desc="Stats extraction"):
         layer = layers[i].to(args.device)
 
         subset = find_layers(layer)
@@ -75,7 +73,9 @@ def extract_layer_statistics(layers, args, inps, **kwargs):
         for name in subset:
             handles.append(subset[name].register_forward_hook(add_batch(name)))
 
-        for j in tqdm.tqdm(range(args.nsamples), leave=False):
+        for j in tqdm.tqdm(
+            range(args.nsamples), leave=False, desc=f"Processing samples"
+        ):
             outs[j] = layer(inps[j].unsqueeze(0), **kwargs)[0]
         for h in handles:
             h.remove()
@@ -84,6 +84,51 @@ def extract_layer_statistics(layers, args, inps, **kwargs):
             sleekit[name].export(
                 os.path.join(args.path, f"{i}.{name}"), npy_format=args.numpy
             )
+            sleekit[name].free()
+
+        inps, outs = outs, inps
+        layers[i] = layer.cpu()
+        del layer
+        del sleekit
+        torch.cuda.empty_cache()
+
+
+def quantize_layers(layers, args, inps, **kwargs):
+    outs = torch.zeros_like(inps)
+    for i in tqdm.tqdm(range(len(layers)), desc="Quantization"):
+        layer = layers[i].to(args.device)
+
+        subset = find_layers(layer)
+        sleekit = {}
+        for name in subset:
+            sleekit[name] = Sleekit(subset[name])
+
+        def add_batch(name):
+            def tmp(_, inp, out):
+                sleekit[name].add_batch(inp[0].data, out.data)
+
+            return tmp
+
+        handles = []
+        for name in subset:
+            handles.append(subset[name].register_forward_hook(add_batch(name)))
+
+        for j in tqdm.tqdm(
+            range(args.nsamples), leave=False, desc=f"Processing samples"
+        ):
+            outs[j] = layer(inps[j].unsqueeze(0), **kwargs)[0]
+        for h in handles:
+            h.remove()
+
+        for name in subset:
+            if args.type == "basic":
+                sleekit[name].quantize_basic(args.nbits)
+            elif args.type == "sleekit-light":
+                sleekit[name].quantize_sleekit_light(args.nbits)
+            elif args.type == "sleekit-heavy":
+                sleekit[name].quantize_sleekit_heavy(args.nbits)
+            else:
+                raise ValueError(f"Unknown quantization type {args.type}")
             sleekit[name].free()
 
         inps, outs = outs, inps
@@ -195,5 +240,16 @@ def extract_statistics(model, dataloader, args):
 
     layers, inps, cache = extract_inputs(model, dataloader, args)
     extract_layer_statistics(layers, args, inps, **cache)
+
+    model.config.use_cache = use_cache
+
+
+@torch.no_grad()
+def quantize_model(model, dataloader, args):
+    use_cache = model.config.use_cache
+    model.config.use_cache = False
+
+    layers, inps, cache = extract_inputs(model, dataloader, args)
+    quantize_layers(layers, args, inps, **cache)
 
     model.config.use_cache = use_cache
