@@ -86,16 +86,14 @@ def export_compare_graph(b):
     standard = [1.0 for d in data["Standard"]]
     correction = sorted(data["Correction"] / data["Standard"], reverse=True)
     scaling = sorted(data["Scaling"] / data["Standard"], reverse=True)
-    sleekit = sorted(data["ScalingBiasOrder"] / data["Standard"], reverse=True)
-    sleekit_ls100 = sorted(
-        data["ScalingBiasOrderLS100"] / data["Standard"], reverse=True
-    )
+    sleekit_light = sorted(data["SleekitLight"] / data["Standard"], reverse=True)
+    sleekit_heavy = sorted(data["SleekitHeavy"] / data["Standard"], reverse=True)
     geomean_correction = 100 * np.exp(np.mean(np.log(correction))) - 100
     geomean_scaling = 100 * np.exp(np.mean(np.log(scaling))) - 100
-    geomean_sleekit = 100 * np.exp(np.mean(np.log(sleekit))) - 100
-    geomean_sleekit_ls100 = 100 * np.exp(np.mean(np.log(sleekit_ls100))) - 100
+    geomean_sleekit_light = 100 * np.exp(np.mean(np.log(sleekit_light))) - 100
+    geomean_sleekit_heavy = 100 * np.exp(np.mean(np.log(sleekit_heavy))) - 100
     print(
-        f"Compare {b}b: correction {geomean_correction:+.2f}%, scaling {geomean_scaling:+.2f}%, sleekit {geomean_sleekit:+.2f}%, sleekit local search {geomean_sleekit_ls100:+.2f}%"
+        f"Compare {b}b: correction {geomean_correction:+.2f}%, scaling {geomean_scaling:+.2f}%, sleekit light {geomean_sleekit_light:+.2f}%, sleekit heavy {geomean_sleekit_heavy:+.2f}%"
     )
 
     plt.title(f"Relative error with Sleekit ({b}-bit); lower is better")
@@ -114,8 +112,8 @@ def export_compare_graph(b):
     plt.plot(standard, label="No change", color="blue")
     plt.plot(scaling, label="Only diagonal scaling", color="green")
     plt.plot(correction, label="Only bias correction", color="orange")
-    plt.plot(sleekit, label="Sleekit", color="red")
-    plt.plot(sleekit_ls100, label="Sleekit + local search", color="brown")
+    plt.plot(sleekit_light, label="Sleekit light", color="red")
+    plt.plot(sleekit_heavy, label="Sleekit heavy", color="brown")
     plt.legend()
     plt.savefig(f"results/compare_{b}b.png")
     # plt.show()

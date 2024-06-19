@@ -14,7 +14,6 @@ parser.add_argument("dir", type=str, help="Directory containing the weights")
 parser.add_argument(
     "--codebook-size", type=int, default=4, help="Size of the codebook to use"
 )
-parser.add_argument("--damp", type=float, default=0.01, help="Hessian dampening")
 gp = parser.add_argument_group("Optimization")
 gp.add_argument(
     "--grid-size", type=int, default=100, help="Grid size for error minimization"
@@ -43,7 +42,7 @@ roots = sorted(
     ]
 )
 
-msg = "Data\tStandard\tCorrection\tScaling\tScalingBiasOrder\tScalingOrder\tScalingBias\tScalingBiasOrderLS100"
+msg = "Data\tStandard\tCorrection\tScaling\tSleekitLight\tSleekitHeavy"
 
 print(msg)
 
@@ -65,12 +64,12 @@ for root in it:
     )
     # Standard GPTQ
     standard_weight = quantize_with_scaling(
-        weight, sc, cb, H=standard_hessian, act_order="diag", damp=args.damp
+        weight, sc, cb, H=standard_hessian, act_order="diag", damp=0.01
     )
     standard_error = quantization_error(weight, standard_weight, H=standard_hessian)
     # Integrated bias correction only
     correction_weight = quantize_with_scaling(
-        weight, sc, cb, H=corrected_hessian, act_order="diag", damp=args.damp
+        weight, sc, cb, H=corrected_hessian, act_order="diag", damp=0.01
     )
     correction_error = quantization_error(
         weight, correction_weight, H=corrected_hessian
@@ -85,7 +84,9 @@ for root in it:
         max_factor=args.max_factor,
     )
     # Scaling only
-    scaling_weight = quantize_with_scaling(weight, sc, cb, H=standard_hessian, damp=args.damp)
+    scaling_weight = quantize_with_scaling(
+        weight, sc, cb, H=standard_hessian, damp=0.01
+    )
     scaling_error = quantization_error(weight, scaling_weight, H=standard_hessian)
 
     sc = compute_min_mse_scaling(
@@ -96,35 +97,36 @@ for root in it:
         min_factor=args.min_factor,
         max_factor=args.max_factor,
     )
-    # Scaling + integrated bias correction + improved ordering
-    scaling_bias_order_weight = quantize_with_scaling(
-        weight, sc, cb, H=corrected_hessian, act_order="sqerr", damp=args.damp
+    # Sleekit light
+    sleekit_light_weight = quantize_with_scaling(
+        weight, sc, cb, H=corrected_hessian, act_order="sqerr", damp=0.03
     )
-    scaling_bias_order_error = quantization_error(
-        weight, scaling_bias_order_weight, H=corrected_hessian
-    )
-    # Scaling + basic bias correction + improved ordering
-    scaling_order_weight = quantize_with_scaling(
-        weight, sc, cb, H=standard_hessian, act_order="sqerr", damp=args.damp
-    )
-    scaling_order_error = quantization_error(
-        weight, scaling_order_weight, H=corrected_hessian
-    )
-    # Scaling + integrated bias correction + basic ordering
-    scaling_bias_weight = quantize_with_scaling(
-        weight, sc, cb, H=corrected_hessian, act_order="diag", damp=args.damp
-    )
-    scaling_bias_error = quantization_error(
-        weight, scaling_bias_weight, H=corrected_hessian
-    )
-    # Scaling + integrated bias correction + improved ordering + local search
-    scaling_bias_order_ls100_weight = quantize_with_scaling(
-        weight, sc, cb, H=corrected_hessian, act_order="sqerr", damp=args.damp, nb_ls_moves=100
-    )
-    scaling_bias_order_ls100_error = quantization_error(
-        weight, scaling_bias_order_ls100_weight, H=corrected_hessian
+    sleekit_light_error = quantization_error(
+        weight, sleekit_light_weight, H=corrected_hessian
     )
 
-    msg = f"{name}\t{standard_error}\t{correction_error}\t{scaling_error}\t{scaling_bias_order_error}\t{scaling_order_error}\t{scaling_bias_error}\t{scaling_bias_order_ls100_error}"
+    sc = compute_min_mse_scaling(
+        weight,
+        cb,
+        grid_size=args.grid_size,
+        H=corrected_hessian,
+        min_factor=args.min_factor,
+        max_factor=args.max_factor,
+    )
+    # Sleekit heavy
+    sleekit_heavy_weight = quantize_with_scaling(
+        weight,
+        sc,
+        cb,
+        H=corrected_hessian,
+        act_order="sqerr",
+        damp=0.03,
+        nb_ls_moves=100,
+    )
+    sleekit_heavy_error = quantization_error(
+        weight, sleekit_heavy_weight, H=corrected_hessian
+    )
+
+    msg = f"{name}\t{standard_error}\t{correction_error}\t{scaling_error}\t{sleekit_light_error}\t{sleekit_heavy_error}"
 
     it.write(msg)
