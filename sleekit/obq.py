@@ -137,25 +137,6 @@ def _quantize_opt_block(Q, E, Hinv, quantizer, min_block_size, num_blocks):
         Q[:, e:] -= E[:, i:e] @ Hinv[i:e, e:]
 
 
-def _quantize_opt_ordered(W, H, quantizer, order, min_block_size, num_blocks):
-    """
-    Apply quantization optimization with a given ordering.
-    """
-    # Apply reordering
-    W = W[:, order]
-    H = H[order][:, order]
-
-    # Apply the algorithm itself
-    Hinv = compute_hessian_chol(H)
-    Q = W.copy()
-    E = np.zeros_like(W)
-    _quantize_opt_block(Q, E, Hinv, quantizer, min_block_size, num_blocks)
-
-    # Reverse reordering
-    Q = Q[:, np.argsort(order)]
-    return Q
-
-
 def _cholesky_ordering(H):
     """
     Compute a good ordering of the matrix based on pivoted Cholesky decomposition.
@@ -190,10 +171,10 @@ def quantize_opt(
     H,
     quantizer,
     act_order="diag",
-    min_block_size=32,
-    num_blocks=8,
     damp=0.01,
     nb_ls_moves=0,
+    min_block_size=32,
+    num_blocks=8,
 ):
     """
     Quantize the weights with the given quantizer, minimizing the squared error using a GPTQ-like algorithm.
@@ -202,6 +183,8 @@ def quantize_opt(
     :param H: Hessian of the error (2D array)
     :param quantizer: Function that quantizes its argument and returns it
     :param act_order: Ordering heuristic to use
+    :param damp: Dampening factor for the Hessian
+    :param nb_ls_moves: Number of local search moves
     :returns: Quantized weights
     """
     assert W.ndim == 2
@@ -212,9 +195,24 @@ def quantize_opt(
     W = W.astype(np.float32)
     H = H.astype(np.float32)
 
-    dampened = H + damp * H.diagonal().mean() * np.eye(H.shape[0])
-    order = compute_hessian_order(W, dampened, quantizer, act_order)
-    Q = _quantize_opt_ordered(W, dampened, quantizer, order, min_block_size, num_blocks)
+    H_opt = H + damp * H.diagonal().mean() * np.eye(H.shape[0])
+    order = compute_hessian_order(W, H_opt, quantizer, act_order)
+
+    # Apply reordering
+    W = W[:, order]
+    Q = W.copy()
+    H_opt = H_opt[order][:, order]
+    Hinv = compute_hessian_chol(H_opt)
+
+    # Apply the algorithm itself
+    E = np.zeros_like(W)
+    _quantize_opt_block(Q, E, Hinv, quantizer, min_block_size, num_blocks)
+
+    # Reverse reordering
+    W = W[:, np.argsort(order)]
+    Q = Q[:, np.argsort(order)]
+
+    # Perform local search
     Q = quantize_local_search(W, Q, H, quantizer, nb_ls_moves)
     return Q
 

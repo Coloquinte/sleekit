@@ -7,6 +7,7 @@ from sleekit.scaling import (
     apply_scaling,
     compute_non_saturating_scaling,
     compute_min_mse_scaling,
+    compute_obq_scaling,
     compute_scaling,
     quantize_with_scaling,
 )
@@ -119,10 +120,10 @@ def test_min_mse_scaling_obq():
     data = np.random.randn(20, 50).astype(np.float32)
     cb = UniformCodebook(9, -2, 2)
     H = random_psd_matrix(50, 10, damp=1.0e-6)
-    sc = compute_min_mse_scaling(data, cb, 0, H=H, obq=True)
+    sc = compute_obq_scaling(data, cb, 0, H=H)
     assert len(sc) == 20
     H = random_psd_matrix(20, 10, damp=1.0e-6)
-    sc = compute_min_mse_scaling(data, cb, 1, H=H, obq=True)
+    sc = compute_obq_scaling(data, cb, 1, H=H)
     assert len(sc) == 50
 
 
@@ -134,7 +135,7 @@ def test_min_mse_scaling_quality():
     sc_base = compute_min_mse_scaling(data, cb, 0)
     sc_diag = compute_min_mse_scaling(data, cb, 0, H=H.diagonal())
     sc_hessian = compute_min_mse_scaling(data, cb, 0, H=H)
-    sc_obq = compute_min_mse_scaling(data, cb, 0, H=H, obq=True)
+    sc_obq = compute_obq_scaling(data, cb, 0, H=H)
     q_base = quantize_with_scaling(data, sc_base, cb)
     q_diag = quantize_with_scaling(data, sc_diag, cb)
     q_hessian = quantize_with_scaling(data, sc_hessian, cb)
