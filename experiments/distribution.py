@@ -54,9 +54,7 @@ for root in tqdm.tqdm(roots):
     elif args.scaling == "hessian":
         sc = compute_min_mse_scaling(weight, cb, H=hessian, grid_size=args.grid_size)
     elif args.scaling == "obq":
-        sc = compute_min_mse_scaling(
-            weight, cb, H=hessian, grid_size=args.grid_size, obq=True
-        )
+        sc = compute_obq_scaling(weight, cb, H=hessian, grid_size=args.grid_size)
     elif args.scaling == "mse":
         sc = compute_min_mse_scaling(weight, cb, grid_size=args.grid_size)
     else:
