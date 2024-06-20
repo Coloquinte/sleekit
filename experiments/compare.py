@@ -78,8 +78,8 @@ for root in it:
     sc = compute_min_mse_scaling(
         weight,
         cb,
-        grid_size=args.grid_size,
         H=standard_hessian.diagonal(),
+        grid_size=args.grid_size,
         min_factor=args.min_factor,
         max_factor=args.max_factor,
     )
@@ -92,8 +92,8 @@ for root in it:
     sc = compute_min_mse_scaling(
         weight,
         cb,
-        grid_size=args.grid_size,
         H=corrected_hessian.diagonal(),
+        grid_size=args.grid_size,
         min_factor=args.min_factor,
         max_factor=args.max_factor,
     )
@@ -105,11 +105,14 @@ for root in it:
         weight, sleekit_light_weight, H=corrected_hessian
     )
 
-    sc = compute_min_mse_scaling(
+    sc = compute_obq_scaling(
         weight,
         cb,
-        grid_size=args.grid_size,
+        0,
         H=corrected_hessian,
+        act_order="sqerr",
+        damp=0.03,
+        grid_size=args.grid_size,
         min_factor=args.min_factor,
         max_factor=args.max_factor,
     )
