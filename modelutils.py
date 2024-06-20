@@ -253,3 +253,6 @@ def quantize_model(model, dataloader, args):
     quantize_layers(layers, args, inps, **cache)
 
     model.config.use_cache = use_cache
+
+    if args.checkpoint is not None:
+        torch.save(model.state_dict(), args.checkpoint)
