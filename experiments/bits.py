@@ -63,9 +63,11 @@ bits = [
     (32, 5),
 ]
 
-msg = "Data\tScaling"
+msg = "Data"
 for sz, b in bits:
-    msg += f"\t{b}-bit"
+    msg += f"\tStandard{b}-bit"
+for sz, b in bits:
+    msg += f"\tSleekitLight{b}-bit"
 print(msg)
 
 it = tqdm.tqdm(roots)
@@ -74,10 +76,8 @@ for root in it:
     hessian = np.load(os.path.join(root, "hessian.npy")).astype(np.float32)
     mean = np.load(os.path.join(root, "mean.npy")).astype(np.float32)
     remove_dead_values(hessian, weight)
-    if args.correct_bias:
-        hessian = remove_input_bias(hessian, mean)
     name = os.path.relpath(root, args.dir)
-    msg = f"{name}\t{args.scaling}"
+    msg = f"{name}"
 
     for sz, b in bits:
         cb = UniformCodebook(sz, -1, 1)
@@ -85,12 +85,32 @@ for root in it:
             weight,
             cb,
             H=hessian,
-            mode=args.scaling,
+            mode="mse",
             grid_size=args.grid_size,
             min_factor=args.min_factor,
             max_factor=args.max_factor,
         )
-        quant_weight = quantize_with_scaling(weight, sc, cb, H=hessian, damp=args.damp)
+        quant_weight = quantize_with_scaling(
+            weight, sc, cb, H=hessian, act_order="diag", damp=0.01
+        )
         error = quantization_error(weight, quant_weight, H=hessian)
         msg += f"\t{error}"
+
+    for sz, b in bits:
+        cb = UniformCodebook(sz, -1, 1)
+        sc = compute_scaling(
+            weight,
+            cb,
+            H=hessian,
+            mode="diag",
+            grid_size=args.grid_size,
+            min_factor=args.min_factor,
+            max_factor=args.max_factor,
+        )
+        quant_weight = quantize_with_scaling(
+            weight, sc, cb, H=hessian, act_order="sqerr", damp=0.03
+        )
+        error = quantization_error(weight, quant_weight, H=hessian)
+        msg += f"\t{error}"
+
     it.write(msg)

@@ -248,11 +248,11 @@ def export_bits_graph():
         data = pandas.read_csv(f"results/bits.csv", sep="\t")
     except FileNotFoundError:
         return
-    d2_8 = sorted(data["2.8-bit"] / data["3-bit"], reverse=True)
-    d2_3 = sorted(data["2.3-bit"] / data["3-bit"], reverse=True)
-    d2 = sorted(data["2-bit"] / data["3-bit"], reverse=True)
-    d1_5 = sorted(data["1.5-bit"] / data["3-bit"], reverse=True)
-    d1 = sorted(data["1-bit"] / data["3-bit"], reverse=True)
+    d2_8 = sorted(data["Standard2.8-bit"] / data["Standard3-bit"], reverse=True)
+    d2_3 = sorted(data["Standard2.3-bit"] / data["Standard3-bit"], reverse=True)
+    d2 = sorted(data["Standard2-bit"] / data["Standard3-bit"], reverse=True)
+    d1_5 = sorted(data["Standard1.5-bit"] / data["Standard3-bit"], reverse=True)
+    d1 = sorted(data["Standard1-bit"] / data["Standard3-bit"], reverse=True)
     geomean_d2_8 = np.exp(np.mean(np.log(d2_8)))
     geomean_d2_3 = np.exp(np.mean(np.log(d2_3)))
     geomean_d2 = np.exp(np.mean(np.log(d2)))
