@@ -61,9 +61,9 @@ def export_correction_graph(b):
     plt.ylabel("Error relative to GPTQ alone (%)")
     plt.yscale("log")
     plt.xlim(left=0, right=len(data) - 1)
-    plt.ylim(bottom=0.25, top=2.0)
+    plt.ylim(bottom=0.25, top=1.5)
 
-    yticks = [0.3, 0.4, 0.5, 0.6, 0.8, 1.0, 1.2, 1.5, 2.0]
+    yticks = [0.3, 0.4, 0.5, 0.6, 0.8, 1.0, 1.2, 1.5]
     plt.gca().set_yticks([])
     plt.gca().set_yticks([], minor=True)
     plt.gca().set_yticks(yticks)
@@ -178,9 +178,9 @@ def export_local_search_graph(b):
     plt.ylabel("Error relative to no local search (%)")
     plt.yscale("log")
     plt.xlim(left=0, right=len(data) - 1)
-    plt.ylim(bottom=0.125, top=2.0)
+    plt.ylim(bottom=0.25, top=1.5)
 
-    yticks = [0.2, 0.3, 0.4, 0.5, 0.6, 0.8, 1.0, 1.2, 1.5, 2.0]
+    yticks = [0.3, 0.4, 0.5, 0.6, 0.8, 1.0, 1.2, 1.5]
     plt.gca().set_yticks([])
     plt.gca().set_yticks([], minor=True)
     plt.gca().set_yticks(yticks)

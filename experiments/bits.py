@@ -107,6 +107,7 @@ for root in it:
             min_factor=args.min_factor,
             max_factor=args.max_factor,
         )
+        # FIXME: this should use the corrected hessian here
         quant_weight = quantize_with_scaling(
             weight, sc, cb, H=hessian, act_order="sqerr", damp=0.03
         )

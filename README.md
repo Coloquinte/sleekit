@@ -29,6 +29,7 @@ Analyzing the error at the layer level is therefore the natural approach.
 Moreover, network-level metrics have a tendency to be noisy, can hide small quantization errors or on the contrary be over-sensitive to some layers.
 
 Our baseline for comparison is the [GPTQ](https://arxiv.org/abs/2210.17323) algorithm with 3-bit and 1.5-bit weights.
+We use GPTQ's given parameters for the heuristic (diagonal ordering and 1% dampening).
 For the layer weights and metrics, we use layer statistics from a full accuracy run on several smaller networks (OPT-125M, OPT-350M, BLOOM-560M).
 We compare the error introduced by the quantization with and without our methods.
 
@@ -46,10 +47,13 @@ We test three different approaches to scaling, and compare the layer error after
 * using the diagonal of the hessian matrix to compute the error, which has the same computational cost as the MSE;
 * using the full weight optimization to compute the error for each scaling value, which is extremely expensive but is theoretically optimal.
 
+<div align="center">
 <img src="results/scaling_1.5b.png" width=45%><img src="results/scaling_3b.png" width=45%>
+</div>
 
 The usual approach of minimizing the MSE yields results that are far from optimal.
-Using the full hessian matrix or its diagonal yields similar results that are on average much better than MSE alone, although they are still far from the theoretical optimum of integrating the weight optimization algorithm with the scaling method.
+Using the full hessian matrix or its diagonal yields similar results that are on average much better than MSE alone.
+Results are far from the theoretical optimum, and even slightly degraded for some layers, leaving room for improvement. 
 
 
 ### Trick 2: combining with bias correction
@@ -64,12 +68,12 @@ We test three different ways to update the bias:
 * applying bias correction after weight optimization, yielding a slightly smaller layer error;
 * taking the effect of bias correction into account during weight optimization.
 
+<div align="center">
 <img src="results/correction_1.5b.png" width=45%><img src="results/correction_3b.png" width=45%>
+</div>
 
 Adding back bias correction greatly improves certain layers, in particular some attention layers in all networks.
-While it is always an improvement in theory, bias correction can play havoc with the optimization algorithm, and taking it into account during weight optimization is sometimes detrimental.
-Adding bias correction after optimization, or picking the best of the two results, is always better than the baseline.
-Unsurprisingly, it has more impact with a more agressive quantization.
+Unsurprisingly, it has more impact with a more agressive quantization and yields better result if taken into account for weight optimization.
 
 ### Trick 3: adding local search
 
@@ -77,20 +81,29 @@ The weight optimization problem is NP-hard, and can only be solved at scale in a
 GPTQ provides a good heuristic for it, however the heuristic of choice to obtain good solutions to similar problems (QUBO) is a simple local search.
 For this reason, we test the effect of applying a few local search moves after GPTQ, in a best-first manner.
 
+<div align="center">
 <img src="results/local_search_1.5b.png" width=45%><img src="results/local_search_3b.png" width=45%>
+</div>
 
 The effect of just a few local search moves is notable on many layers, and applying them after GPTQ can drastically reduce layer error.
 
 ### Minor tricks
 
 Other tricks yield smaller but useful improvements:
-* Using a different ordering for GPTQ. GPTQ makes rounding decisions for the weights in a greedy manner; they obtain a good ordering using the diagonal of the matrix in decreasing order. We improve this slightly, and multiply this value by the sum of squares of the quantization error (without correction); this takes better account of the effect of saturation.
+* Using a different ordering for GPTQ. GPTQ makes rounding decisions for the weights in a greedy manner; they obtain a good ordering using the diagonal of the matrix in decreasing order. 
+Instead, we multiply this value by the sum of squares of the quantization error; this takes better account of the effect of saturation.
 * Using a different dampening for GPTQ. GPTQ does not behave well on ill-conditioned matrix, and adding a larger penalty term to the matrix paradoxically yields better results.
+The original paper uses a 1% penalty, but penalties of 3-10% behave better, while removing the penalty altogether degrades results significantly.
+
+<div align="center">
+<img src="results/ordering_3b.png" width=40%><img src="results/dampening_3b.png" width=40%>
+</div>
 
 ### The many tricks that do not work
 
 The following approaches did not yield promising results and were abandoned:
-* Improved codebooks: the data is far from being gaussian-distributed, but training a codebook naively is not better than a NF4 codebook. A good codebook training would take the importance of individual weights in the layer into account.
+* Improved codebooks: the data is far from being gaussian-distributed, but training a codebook naively on the data is not better than a [NF4 codebook](https://arxiv.org/abs/2305.14314).
+A good codebook training needs to take the hessian (or its diagonal) into account.
 * Entropy coding: it is tempting to combine codebook optimization with entropy coding to reduce storage needs. However, the gain in entropy is not huge compared to an error-optimized codebook, and does not seem worth the effort.
 * GPTQ reordering: clever heuristic orderings for GPTQ based on the hessian matrix do not bring a reduction in layer error, compared to using its diagonal as the original paper does. We tested several variations using the diagonal of the inverse and pivoted Cholesky decompositions.
 * More complex algorithms for weight optimization: it just doesn't scale, but if you want to go in this direction you probably want to use the [MQLib](https://github.com/MQLib/MQLib) as a solver.
@@ -101,16 +114,21 @@ Finally, we put these algorithms together in Sleekit:
 
 1. the hessian matrix is modified to represent the effect of bias correction;
 2. scaling is performed based on the hessian diagonal;
-3. weight optimization uses our slightly improved ordering.
+3. weight optimization uses our slightly improved ordering and dampening.
 
-The computational cost of the algorithm is not increased so far compared to GPTQ. At the cost of additional computations we add:
+The computational cost of the algorithm is not increased so far compared to GPTQ: this is the "Sleekit light" version.
 
-4. local search is performed during weight optimization for 100 moves.
+At the cost of additional computations we add the following for the "Sleekit heavy" version:
 
+4. scaling is performed based on a weight optimization computation;
+5. local search is performed during the final weight optimization for 1000 moves.
 
-The various tricks interact well, and their benefits seem to stack, reducing the squared error by one third on average.
-
+<div align="center">
 <img src="results/compare_1.5b.png" width=45%><img src="results/compare_3b.png" width=45%>
+</div>
+
+Most of the improvement is due to the better scaling method, but the various methods stack well. Together, they yield to a reduced error on almost all layers.
+On the other hand, a minority of layers experiences a huge improvement, with error reduced by 80% or more. It is still unclear what the impact is for the neural network as a whole.
 
 ## References
 
