@@ -73,9 +73,10 @@ print(msg)
 it = tqdm.tqdm(roots)
 for root in it:
     weight = np.load(os.path.join(root, "weight.npy")).astype(np.float32)
-    hessian = np.load(os.path.join(root, "hessian.npy")).astype(np.float32)
+    standard_hessian = np.load(os.path.join(root, "hessian.npy")).astype(np.float32)
     mean = np.load(os.path.join(root, "mean.npy")).astype(np.float32)
-    remove_dead_values(hessian, weight)
+    remove_dead_values(standard_hessian, weight)
+    corrected_hessian = remove_input_bias(standard_hessian, mean)
     name = os.path.relpath(root, args.dir)
     msg = f"{name}"
 
@@ -84,16 +85,16 @@ for root in it:
         sc = compute_scaling(
             weight,
             cb,
-            H=hessian,
+            H=standard_hessian,
             mode="mse",
             grid_size=args.grid_size,
             min_factor=args.min_factor,
             max_factor=args.max_factor,
         )
         quant_weight = quantize_with_scaling(
-            weight, sc, cb, H=hessian, act_order="diag", damp=0.01
+            weight, sc, cb, H=standard_hessian, act_order="diag", damp=0.01
         )
-        error = quantization_error(weight, quant_weight, H=hessian)
+        error = quantization_error(weight, quant_weight, H=standard_hessian)
         msg += f"\t{error}"
 
     for sz, b in bits:
@@ -101,17 +102,16 @@ for root in it:
         sc = compute_scaling(
             weight,
             cb,
-            H=hessian,
+            H=corrected_hessian,
             mode="diag",
             grid_size=args.grid_size,
             min_factor=args.min_factor,
             max_factor=args.max_factor,
         )
-        # FIXME: this should use the corrected hessian here
         quant_weight = quantize_with_scaling(
-            weight, sc, cb, H=hessian, act_order="sqerr", damp=0.03
+            weight, sc, cb, H=corrected_hessian, act_order="sqerr", damp=0.03
         )
-        error = quantization_error(weight, quant_weight, H=hessian)
+        error = quantization_error(weight, quant_weight, H=corrected_hessian)
         msg += f"\t{error}"
 
     it.write(msg)
