@@ -55,7 +55,6 @@ The usual approach of minimizing the MSE yields results that are far from optima
 Using the full hessian matrix or its diagonal yields similar results that are on average much better than MSE alone.
 Results are far from the theoretical optimum, and even slightly degraded for some layers, leaving room for improvement. 
 
-
 ### Trick 2: combining with bias correction
 
 [Bias correction](https://arxiv.org/abs/1810.05723) is a method used to reduce the impact of quantization on a layer.
@@ -129,6 +128,52 @@ At the cost of additional computations we add the following for the "Sleekit hea
 
 Most of the improvement is due to the better scaling method, but the various methods stack well. Together, they yield to a reduced error on almost all layers.
 On the other hand, a minority of layers experiences a huge improvement, with error reduced by 80% or more. It is still unclear what the impact is for the neural network as a whole.
+
+### Numerical results
+
+All results are available in the `results` folder. The geometric mean impact of each trick on the mean squared error against the default GPTQ is shown below.
+
+<details>
+<summary>Expand numerical results</summary>
+
+| Scaling method | 3b      | 2b      | 1.5b    | 1b      |
+| -------------- | ------- | ------- | ------- | ------- |
+| Diagonal       | -20.25% | -16.66% | -15.52% | -7.78%  |
+| Hessian        | -20.50% | -18.41% | -16.36% | -19.48% |
+| Exhaustive     | -29.68% | -29.35% | -26.03% | -30.64% |
+
+| Correction method   | 3b      | 2b      | 1.5b    | 1b      |
+| ------------------- | ------- | ------- | ------- | ------- |
+| After optimization  | -1.72%  | -4.11%  | -5.01%  | -10.78% |
+| During optimization | -4.01%  | -6.72%  | -7.90%  | -13.44% |
+
+| Local search duration | 3b      | 2b      | 1.5b    | 1b      |
+| --------------------- | ------- | ------- | ------- | ------- |
+| 10 moves              | -4.51%  | -6.05%  | -7.07%  | -9.57%  |
+| 100 moves             | -9.42%  | -13.47% | -15.64% | -20.25% |
+
+| Ordering                 | 3b     | 2b     | 1.5b   | 1b     |
+| ------------------------ | ------ | ------ | ------ | ------ |
+| Diagonal * Error         | -0.57% | -0.62% | -0.59% | -0.50% |
+| Diagonal * Squared Error | -1.95% | -1.69% | -1.35% | -1.40% |
+
+| Dampening  | 3b      | 2b      | 1.5b    | 1b      |
+| ---------- | ------- | ------- | ------- | ------- |
+| 0.001      | +2.52%  | +3.50%  | +2.72%  | +3.17%  |
+| 0.003      | +1.29%  | +1.73%  | +1.57%  | +1.63%  |
+| 0.03       | -0.91%  | -1.49%  | -1.54%  | -1.91%  |
+| 0.1        | -0.03%  | -1.91%  | -2.14%  | -3.86%  |
+| 0.3        | +5.42%  | +1.42%  | +0.45%  | -3.67%  |
+| 1.0        | +19.78% | +12.48% | +10.08% | +1.47%  |
+
+| Method                   | 3b      | 2b      | 1.5b    | 1b      |
+| ------------------------ | ------- | ------- | ------- | ------- |
+| Correction only          | -4.01%  | -6.72%  | -7.90%  | -13.44% |
+| Diagonal scaling only    | -20.25% | -16.66% | -15.52% | -7.78%  |
+| Sleekit light            | -25.04% | -23.90% | -22.43% | -20.50% |
+| Sleekit heavy            | -34.86% | -36.49% | -34.33% | -41.94% |
+
+</details>
 
 ## References
 
