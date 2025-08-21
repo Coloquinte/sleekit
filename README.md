@@ -18,7 +18,7 @@ Sleekit uses a very generic quantization method. The steps to quantize a layer a
 
 ## Improvements
 
-We present deveral generic improvements that can be applied to any quantization method.
+We present several generic improvements that can be applied to any quantization method.
 They will target both the scaling step, to select better scaling factors, and the weight optimization step to reduce the layer error.
 
 ### Methodology: layer-per-layer analysis
